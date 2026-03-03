@@ -1,0 +1,137 @@
+---
+title: "Claude Desktop Setup"
+description: "Add instant-db to your Claude Desktop configuration so Claude can create and query databases."
+icon: "monitor"
+---
+
+## Find your config file
+
+Claude Desktop reads tool servers from a JSON config file. Its location depends on your OS:
+
+<Tabs>
+  <Tab title="macOS">
+    ```
+    ~/Library/Application Support/Claude/claude_desktop_config.json
+    ```
+  </Tab>
+  <Tab title="Windows">
+    ```
+    %APPDATA%\Claude\claude_desktop_config.json
+    ```
+  </Tab>
+</Tabs>
+
+If the file doesn't exist yet, create it.
+
+---
+
+## Add the server config
+
+Open the config file and add the `instant-db` entry inside `mcpServers`:
+
+```json claude_desktop_config.json
+{
+  "mcpServers": {
+    "instant-db": {
+      "command": "bun",
+      "args": ["run", "/absolute/path/to/instant-db/src/index.ts"],
+      "env": {
+        "DATA_DIR": "/absolute/path/to/instant-db/data",
+        "LOG_LEVEL": "normal"
+      }
+    }
+  }
+}
+```
+
+<Warning>
+  Use absolute paths — not `~` or relative paths. Claude Desktop spawns the server from a different working directory, so relative paths will fail silently.
+</Warning>
+
+To find your absolute path:
+
+```bash
+cd /path/to/instant-db && pwd
+```
+
+---
+
+## Restart Claude Desktop
+
+Fully quit and reopen Claude Desktop. The instant-db tools will appear in the tool picker (the paperclip / tools icon in the chat input).
+
+You should see these tools available:
+
+- `list_databases`
+- `describe_database`
+- `propose_schema`
+- `create_database`
+- `insert_record`
+- `query_records`
+- `update_record`
+- `delete_record`
+- `count_records`
+
+---
+
+## System prompt
+
+Add this snippet to your Claude system prompt (**Settings → Custom Instructions** or a Project's instructions) for the best experience:
+
+```
+You have access to an instant-db MCP server for persistent structured storage.
+When a user wants to track or store anything structured:
+
+1. Call list_databases first to check what already exists.
+2. If no relevant database exists, call propose_schema and present the proposal
+   conversationally — don't show raw JSON.
+3. Wait for explicit confirmation before calling create_database.
+4. At the start of any session involving an existing database, call
+   describe_database so you know the current schema before inserting or querying.
+```
+
+<Tip>
+  You can also add this per-database: "At the start of any conversation, call `describe_database` for the `workouts` database so you're always up to date."
+</Tip>
+
+---
+
+## Verify it works
+
+In a new Claude conversation, type:
+
+> "List my databases."
+
+Claude should call `list_databases` and respond with an empty list (or your existing databases if you've created any).
+
+---
+
+## Debugging
+
+If something isn't working, check the log file:
+
+```bash
+tail -f /path/to/instant-db/logs/mcp.log | jq .
+```
+
+Each entry shows the tool name, input, output, duration, and any error. This makes it straightforward to see exactly what Claude sent and what the server returned.
+
+<AccordionGroup>
+  <Accordion title="Claude doesn't show any instant-db tools">
+    - Confirm the config file path is correct for your OS
+    - Check that `bun` is on your PATH: `which bun`
+    - Make sure you used absolute paths in the config
+    - Fully quit Claude Desktop (not just close the window) and reopen it
+  </Accordion>
+
+  <Accordion title="Tools appear but calls fail immediately">
+    - Run `bun run src/index.ts` directly in a terminal and look for startup errors
+    - Check that `DATA_DIR` exists and is writable
+    - Verify your `.env` file is present (or env vars are set in the config)
+  </Accordion>
+
+  <Accordion title="Data isn't persisting between sessions">
+    - Confirm `DATA_DIR` in the Claude Desktop config matches where the `.sqlite` files are
+    - Check that the `_registry.json` file exists in your `DATA_DIR`
+  </Accordion>
+</AccordionGroup>

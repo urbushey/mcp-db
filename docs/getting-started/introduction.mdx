@@ -1,0 +1,67 @@
+---
+title: "Introduction"
+description: "instant-db is an MCP server that gives any AI assistant persistent, structured storage — no SQL, no schema files, no config beyond initial setup."
+icon: "database"
+---
+
+## What is instant-db?
+
+instant-db is a [Model Context Protocol (MCP)](https://modelcontextprotocol.io) server. Once connected to Claude Desktop, it gives Claude the ability to create and manage local SQLite databases entirely through conversation.
+
+You never write SQL. You never define a schema. You describe what you want to track, Claude proposes a structure, you confirm it, and the database exists. Every insert, query, update, and delete happens the same way — just ask.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/getting-started/quick-start">
+    Get up and running in under 10 minutes
+  </Card>
+  <Card title="Claude Desktop Setup" icon="monitor" href="/getting-started/claude-desktop-setup">
+    Connect instant-db to Claude Desktop
+  </Card>
+  <Card title="Calorie Diary Guide" icon="book-open" href="/guides/calorie-diary">
+    Build a full calorie tracker from scratch
+  </Card>
+  <Card title="Tool Reference" icon="wrench" href="/reference/tools">
+    Every MCP tool, explained
+  </Card>
+</CardGroup>
+
+---
+
+## How it works
+
+<Steps>
+  <Step title="Describe what you want">
+    Tell Claude what you want to track. "I want to log my daily meals and calories."
+  </Step>
+  <Step title="Review the proposed schema">
+    Claude calls `propose_schema` and presents the table structure in plain English. You can ask for changes.
+  </Step>
+  <Step title="Confirm and create">
+    Say "looks good" and Claude calls `create_database`. Your SQLite file is created instantly.
+  </Step>
+  <Step title="Use it naturally">
+    Insert, query, update, and delete records by just asking. Data persists across every session.
+  </Step>
+</Steps>
+
+---
+
+## Key properties
+
+- **Local-first.** All data lives in `.sqlite` files on your machine. Nothing is sent to a server.
+- **Multi-database.** One server instance manages as many named databases as you want — workouts, calories, finances, whatever.
+- **Observable.** Every tool call is logged to `logs/mcp.log` in JSONL format. Open the SQLite files directly in any SQLite browser.
+- **Minimal.** Under 400 lines of source code. No heavy framework.
+
+---
+
+## What it's not (yet)
+
+instant-db is intentionally minimal for v1. The following are out of scope:
+
+- Schema migrations (altering tables after creation)
+- Cross-table joins
+- Data export
+- A web UI
+- Postgres support (the abstraction layer is ready; the adapter is not yet written)
+- Multi-user access control

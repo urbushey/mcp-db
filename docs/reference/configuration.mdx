@@ -1,0 +1,103 @@
+---
+title: "Configuration"
+description: "All environment variables instant-db reads at startup, with defaults and validation rules."
+icon: "sliders"
+---
+
+Configuration is loaded from a `.env` file at startup and validated with [Zod](https://zod.dev). If a required variable is invalid, the server exits immediately with a clear error message.
+
+Copy the example file to get started:
+
+```bash
+cp .env.example .env
+```
+
+---
+
+## Variables
+
+<ParamField body="DATA_DIR" type="string">
+  Directory where `.sqlite` database files and the `_registry.json` manifest are stored.
+
+  **Default:** `./data`
+
+  The directory is created automatically if it doesn't exist. Use an absolute path when running via Claude Desktop.
+</ParamField>
+
+<ParamField body="LOG_LEVEL" type="verbose | normal | off">
+  Controls what gets written to the log file.
+
+  **Default:** `normal`
+
+  | Value | Behaviour |
+  |---|---|
+  | `verbose` | Every tool call logged, including full input and output |
+  | `normal` | Every tool call logged (same as verbose in the current implementation) |
+  | `off` | No log file is written |
+</ParamField>
+
+<ParamField body="LOG_PATH" type="string">
+  Path to the JSONL log file.
+
+  **Default:** `./logs/mcp.log`
+
+  The parent directory is created automatically. Use an absolute path when running via Claude Desktop.
+</ParamField>
+
+<ParamField body="MCP_TRANSPORT" type="stdio">
+  The MCP transport layer to use.
+
+  **Default:** `stdio`
+
+  Only `stdio` is supported in v1. This is the correct transport for Claude Desktop.
+</ParamField>
+
+---
+
+## Setting via Claude Desktop
+
+You can set env vars directly in `claude_desktop_config.json` instead of a `.env` file. Variables in the config take precedence:
+
+```json claude_desktop_config.json
+{
+  "mcpServers": {
+    "instant-db": {
+      "command": "bun",
+      "args": ["run", "/absolute/path/to/instant-db/src/index.ts"],
+      "env": {
+        "DATA_DIR": "/absolute/path/to/instant-db/data",
+        "LOG_LEVEL": "normal",
+        "LOG_PATH": "/absolute/path/to/instant-db/logs/mcp.log"
+      }
+    }
+  }
+}
+```
+
+<Warning>
+  When running via Claude Desktop, always use absolute paths for `DATA_DIR` and `LOG_PATH`. The server is spawned from Claude's working directory, not your project root.
+</Warning>
+
+---
+
+## Log format
+
+Each line in the log file is a JSON object:
+
+```json
+{
+  "timestamp": "2024-01-15T10:30:00.123Z",
+  "tool": "insert_record",
+  "input": { "database": "calories", "table": "meals", "record": { "food": "oatmeal", "kcal": 300 } },
+  "output": { "id": 42 },
+  "durationMs": 3
+}
+```
+
+Error entries include an additional `"error"` field with the message.
+
+### Tailing the log
+
+```bash
+tail -f logs/mcp.log | jq .
+```

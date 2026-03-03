@@ -1,0 +1,201 @@
+---
+title: "Tool Reference"
+description: "Every MCP tool exposed by instant-db, with inputs, outputs, and examples."
+icon: "wrench"
+---
+
+instant-db exposes 9 MCP tools. All inputs are validated with [Zod](https://zod.dev) at runtime. All outputs are JSON strings inside an MCP content block.
+
+---
+
+## Database tools
+
+### `list_databases`
+
+Returns the names of all databases managed by this server instance.
+
+**Input:** none
+
+**Output:**
+<ResponseField name="databases" type="string[]">
+  Array of database names.
+</ResponseField>
+
+```json Example output
+{ "databases": ["workouts", "calories", "finances"] }
+```
+
+---
+
+### `describe_database`
+
+Returns the full schema of a named database — every table, column name, type, and constraint. Call this at the start of any session before inserting or querying.
+
+<ParamField body="database" type="string" required>
+  The name of the database to describe.
+</ParamField>
+
+**Output:**
+<ResponseField name="tables" type="TableSchema[]">
+  <Expandable title="TableSchema properties">
+    <ResponseField name="name" type="string">Table name.</ResponseField>
+    <ResponseField name="columns" type="ColumnDef[]">
+      <Expandable title="ColumnDef properties">
+        <ResponseField name="name" type="string">Column name.</ResponseField>
+        <ResponseField name="type" type="text | integer | real | boolean">Data type.</ResponseField>
+        <ResponseField name="required" type="boolean">Whether the column has a NOT NULL constraint.</ResponseField>
+        <ResponseField name="primaryKey" type="boolean">Whether this column is the primary key.</ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+```json Example output
+{
+  "tables": [
+    {
+      "name": "workout_logs",
+      "columns": [
+        { "name": "id", "type": "integer", "required": true, "primaryKey": true },
+        { "name": "date", "type": "text", "required": true, "primaryKey": false },
+        { "name": "exercise", "type": "text", "required": true, "primaryKey": false },
+        { "name": "sets", "type": "integer", "required": false, "primaryKey": false }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## Schema tools
+
+### `propose_schema`
+
+Given a plain-language description, returns a structured schema proposal. **This tool does not create anything.** Claude presents the result conversationally and waits for confirmation.
+
+If `existing_proposal` is passed (from a previous call), the server returns it back so Claude can modify it based on the user's change request. This keeps the iteration loop stateless on the server side.
+
+<ParamField body="description" type="string" required>
+  Plain-language description of what to track.
+</ParamField>
+
+<ParamField body="existing_proposal" type="TableSchema[]">
+  A previous proposal to iterate on. Optional.
+</ParamField>
+
+**Output:**
+<ResponseField name="tables" type="TableSchema[]">The proposed schema.</ResponseField>
+<ResponseField name="summary" type="string">Human-readable summary for Claude to present.</ResponseField>
+<ResponseField name="description" type="string">The original description, echoed back.</ResponseField>
+
+---
+
+### `create_database`
+
+Creates a named database from a confirmed schema. Fails if the database name already exists.
+
+<ParamField body="database" type="string" required>
+  The name for the new database. Used as the `.sqlite` filename.
+</ParamField>
+
+<ParamField body="tables" type="TableSchema[]" required>
+  The confirmed table schemas. Each table will be created with `CREATE TABLE IF NOT EXISTS`.
+</ParamField>
+
+**Output:**
+<ResponseField name="success" type="boolean">Always `true` on success.</ResponseField>
+<ResponseField name="database" type="string">The database name that was created.</ResponseField>
+<ResponseField name="tables" type="string[]">Names of the tables that were created.</ResponseField>
+
+<Note>
+  Every table automatically gets an `id INTEGER PRIMARY KEY AUTOINCREMENT` column unless you explicitly define one with `primaryKey: true`.
+</Note>
+
+---
+
+## Record tools
+
+### `insert_record`
+
+Inserts a single record into a table. Returns the new row's ID.
+
+<ParamField body="database" type="string" required>The database name.</ParamField>
+<ParamField body="table" type="string" required>The table name.</ParamField>
+<ParamField body="record" type="object" required>
+  Key-value pairs to insert. Keys must match column names. Omit `id` — it is auto-assigned.
+</ParamField>
+
+**Output:**
+<ResponseField name="id" type="number">The auto-incremented ID of the new row.</ResponseField>
+
+---
+
+### `query_records`
+
+Queries records with optional filters, ordering, and a result limit.
+
+<ParamField body="database" type="string" required>The database name.</ParamField>
+<ParamField body="table" type="string" required>The table name.</ParamField>
+<ParamField body="options" type="QueryOptions">
+  <Expandable title="QueryOptions properties">
+    <ParamField body="filters" type="QueryFilter[]">
+      <Expandable title="QueryFilter properties">
+        <ParamField body="column" type="string" required>Column to filter on.</ParamField>
+        <ParamField body="operator" type="= | != | > | < | >= | <= | like" required>Comparison operator.</ParamField>
+        <ParamField body="value" type="string | number | boolean" required>Value to compare against.</ParamField>
+      </Expandable>
+    </ParamField>
+    <ParamField body="orderBy" type="object">
+      <Expandable title="orderBy properties">
+        <ParamField body="column" type="string" required>Column to sort by.</ParamField>
+        <ParamField body="direction" type="asc | desc" required>Sort direction.</ParamField>
+      </Expandable>
+    </ParamField>
+    <ParamField body="limit" type="number">Maximum number of rows to return.</ParamField>
+  </Expandable>
+</ParamField>
+
+**Output:**
+<ResponseField name="records" type="object[]">Array of matching rows.</ResponseField>
+<ResponseField name="count" type="number">Number of rows returned.</ResponseField>
+
+---
+
+### `update_record`
+
+Updates a record by its ID.
+
+<ParamField body="database" type="string" required>The database name.</ParamField>
+<ParamField body="table" type="string" required>The table name.</ParamField>
+<ParamField body="id" type="number" required>The row ID to update.</ParamField>
+<ParamField body="updates" type="object" required>Fields to update. Only provided keys are changed.</ParamField>
+
+**Output:**
+<ResponseField name="success" type="boolean">Always `true` on success.</ResponseField>
+
+---
+
+### `delete_record`
+
+Deletes a record by its ID.
+
+<ParamField body="database" type="string" required>The database name.</ParamField>
+<ParamField body="table" type="string" required>The table name.</ParamField>
+<ParamField body="id" type="number" required>The row ID to delete.</ParamField>
+
+**Output:**
+<ResponseField name="success" type="boolean">Always `true` on success.</ResponseField>
+
+---
+
+### `count_records`
+
+Returns a count of records matching optional filters. Useful for summary queries like "how many workouts this month?"
+
+<ParamField body="database" type="string" required>The database name.</ParamField>
+<ParamField body="table" type="string" required>The table name.</ParamField>
+<ParamField body="filters" type="QueryFilter[]">Optional filters. Same structure as in `query_records`.</ParamField>
+
+**Output:**
+<ResponseField name="count" type="number">Number of matching rows.</ResponseField>

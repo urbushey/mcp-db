@@ -1,0 +1,44 @@
+{
+  "name": "instant-db",
+  "logo": {
+    "light": "/images/logo-light.svg",
+    "dark": "/images/logo-dark.svg"
+  },
+  "favicon": "/images/favicon.svg",
+  "colors": {
+    "primary": "#6366f1",
+    "light": "#818cf8",
+    "dark": "#4f46e5"
+  },
+  "topbarCtaButton": {
+    "type": "github",
+    "url": "https://github.com/your-username/instant-db"
+  },
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "getting-started/introduction",
+        "getting-started/quick-start",
+        "getting-started/claude-desktop-setup"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/calorie-diary"
+      ]
+    },
+    {
+      "group": "Reference",
+      "pages": [
+        "reference/tools",
+        "reference/configuration",
+        "reference/schema-types"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "github": "https://github.com/your-username/instant-db"
+  }
+}

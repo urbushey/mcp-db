@@ -1,0 +1,306 @@
+---
+title: "Build a Calorie Diary"
+description: "A step-by-step tutorial showing how to create a fully functional daily calorie tracker using instant-db and Claude — no code required."
+icon: "salad"
+---
+
+In this guide you'll build a personal calorie diary using nothing but conversation. By the end you'll have a database that tracks your meals and macros, lets you log food in seconds, and can answer questions like "How many calories did I eat last Tuesday?" or "What's my average protein intake this week?"
+
+## What you'll build
+
+- A `calories` database with two tables: `foods` (your personal food library) and `diary_entries` (daily meal logs)
+- A food library you populate once and reuse forever
+- Daily logging in a single sentence
+- Natural-language queries against your history
+
+## Prerequisites
+
+- instant-db installed and connected to Claude Desktop ([Quick Start](/getting-started/quick-start))
+- The [recommended system prompt](/getting-started/claude-desktop-setup#system-prompt) added to Claude
+
+---
+
+## Part 1: Create the database
+
+<Steps>
+  <Step title="Describe what you want to track">
+    Open Claude Desktop and say:
+
+    > "I want to build a calorie diary. I need to track the foods I eat — name, calories, and macros (protein, carbs, fat). I also need a daily log where I record each meal with date, meal name (breakfast/lunch/dinner/snack), the food, how many servings, and total calories."
+
+    Claude will call `propose_schema` and respond with something like:
+
+    > "I'd suggest two tables:
+    >
+    > **foods** — your personal food library
+    > - `name` (text, required)
+    > - `calories_per_serving` (integer, required)
+    > - `serving_size` (text — e.g. "1 cup", "100g")
+    > - `protein_g`, `carbs_g`, `fat_g` (real)
+    >
+    > **diary_entries** — your daily log
+    > - `date` (text, required — ISO format: 2024-01-15)
+    > - `meal` (text, required — breakfast/lunch/dinner/snack)
+    > - `food` (text, required)
+    > - `servings` (real, required)
+    > - `calories` (integer, required)
+    > - `notes` (text)
+    >
+    > Want me to create this, or would you like any changes?"
+  </Step>
+
+  <Step title="Refine if needed">
+    This is your chance to adjust the schema before anything is created. For example:
+
+    > "Add a `fiber_g` column to foods. And add a `mood` field to diary_entries — I want to track whether I was hungry or satisfied after meals."
+
+    Claude will re-propose with those changes. Keep refining until it looks right.
+  </Step>
+
+  <Step title="Confirm creation">
+    When you're happy with the proposal, say:
+
+    > "Looks good, create it."
+
+    Claude calls `create_database` and responds:
+
+    > "Done! I've created the `calories` database with a `foods` table and a `diary_entries` table. Ready to start adding foods."
+
+    <Tip>
+      You can verify the database was created by asking: "Describe my calories database." Claude will call `describe_database` and show you the full schema.
+    </Tip>
+  </Step>
+</Steps>
+
+---
+
+## Part 2: Build your food library
+
+Your `foods` table is a personal reference — add the foods you eat regularly so you can log them quickly later.
+
+<Steps>
+  <Step title="Add your first foods">
+    > "Add these foods to my calories database:
+    > - Oatmeal (1 cup cooked): 150 cal, 5g protein, 27g carbs, 3g fat, 4g fiber
+    > - Eggs (1 large): 70 cal, 6g protein, 0g carbs, 5g fat
+    > - Greek yogurt (1 cup): 130 cal, 17g protein, 9g carbs, 0g fat
+    > - Chicken breast (100g): 165 cal, 31g protein, 0g carbs, 4g fat
+    > - Brown rice (1 cup cooked): 215 cal, 5g protein, 45g carbs, 2g fat"
+
+    Claude calls `insert_record` five times and confirms each one.
+  </Step>
+
+  <Step title="Check your food library">
+    > "Show me all the foods I've added."
+
+    Claude calls `query_records` on the `foods` table and lists everything back. You can ask it to show specific columns or sort alphabetically.
+  </Step>
+
+  <Step title="Add more as you go">
+    You don't need to add everything upfront. Add foods whenever you eat something new:
+
+    > "Add banana (1 medium) to my foods: 105 cal, 1g protein, 27g carbs, 0g fat, 3g fiber."
+  </Step>
+</Steps>
+
+---
+
+## Part 3: Log your first day
+
+<Steps>
+  <Step title="Log breakfast">
+    > "Log my breakfast for today: 1.5 cups oatmeal and 2 eggs."
+
+    Claude looks up the calorie values from your `foods` table (or asks you if it's not there), calculates totals, and inserts the entries:
+
+    > "Logged! Breakfast on 2024-01-15:
+    > - Oatmeal (1.5 servings) — 225 cal
+    > - Eggs (2 servings) — 140 cal
+    >
+    > Breakfast total: 365 calories."
+  </Step>
+
+  <Step title="Log the rest of the day">
+    Keep going throughout the day:
+
+    > "Lunch: 150g chicken breast and 1 cup brown rice."
+
+    > "Snack: 1 cup Greek yogurt."
+
+    > "Dinner: 200g salmon (250 cal per 100g), 2 cups steamed broccoli (55 cal per cup)."
+
+    <Note>
+      Foods you haven't added to your library yet? Claude will either prompt you to add them or log them directly using the calories you provide. You can always add them to `foods` afterward.
+    </Note>
+  </Step>
+
+  <Step title="Check your daily total">
+    > "How many calories did I eat today?"
+
+    Claude calls `query_records` with a filter on today's date, sums the calories, and gives you a breakdown by meal.
+
+    > "Today's total: 1,820 calories
+    > - Breakfast: 365
+    > - Lunch: 495
+    > - Snack: 130
+    > - Dinner: 830"
+  </Step>
+</Steps>
+
+---
+
+## Part 4: Query your history
+
+This is where instant-db gets powerful. You have a full history of everything you've eaten — and you can ask anything.
+
+### Daily summaries
+
+> "What did I eat last Monday?"
+
+> "Show me every day this week with total calories, sorted by date."
+
+> "What was my highest-calorie day this month?"
+
+### Macro tracking
+
+> "What was my average protein intake over the last 7 days?"
+
+> "Show me all meals where I logged more than 600 calories."
+
+> "Which meal do I eat the most calories at — breakfast, lunch, or dinner?"
+
+### Food insights
+
+> "How many times have I eaten chicken breast this month?"
+
+> "What's the most calorie-dense food in my library?"
+
+### Streak and habit queries
+
+> "How many days this week did I log my meals?"
+
+> "Count my diary entries for January."
+
+Claude translates all of these into `query_records` and `count_records` calls, does any arithmetic, and presents the answer in plain English.
+
+---
+
+## Part 5: Update and correct entries
+
+Made a mistake? No problem.
+
+<Steps>
+  <Step title="Find the entry to fix">
+    > "Show me my lunch entries from today."
+
+    Claude returns the rows with their IDs.
+  </Step>
+
+  <Step title="Update it">
+    > "The chicken breast was actually 200g, not 150g. Fix that entry and adjust the calories."
+
+    Claude calls `update_record` with the correct values.
+  </Step>
+
+  <Step title="Delete if needed">
+    > "I forgot — I didn't actually eat that afternoon snack. Delete it."
+
+    Claude calls `delete_record` on the relevant entry.
+  </Step>
+</Steps>
+
+---
+
+## Example conversation
+
+Here's what a full morning logging session looks like in practice:
+
+```
+You:    "Good morning. Log my breakfast: 1 cup oatmeal, 2 eggs, and 1 cup Greek yogurt."
+
+Claude: Logged your breakfast for today (2024-01-15):
+        • Oatmeal (1 serving) — 150 cal
+        • Eggs (2 servings) — 140 cal
+        • Greek yogurt (1 serving) — 130 cal
+        Breakfast total: 420 calories.
+
+You:    "What's my running total so far today?"
+
+Claude: You've logged 420 calories today (breakfast only so far).
+
+You:    "How does that compare to yesterday's breakfast?"
+
+Claude: Yesterday's breakfast was 365 calories, so today's is 55 calories more.
+        Yesterday you had: oatmeal (1.5 servings) and eggs (2 servings).
+
+You:    "What was my total for yesterday?"
+
+Claude: Yesterday's total: 1,820 calories across 4 meals.
+```
+
+---
+
+## Tips for daily use
+
+<AccordionGroup>
+  <Accordion title="Log in bulk at the end of the day">
+    You don't have to log meal by meal. Dump everything at once:
+
+    > "Log today: breakfast was 2 eggs and toast (80 cal), lunch was a turkey sandwich (450 cal), dinner was pasta with chicken (700 cal), plus a banana snack."
+
+    Claude will insert all entries in one go.
+  </Accordion>
+
+  <Accordion title="Use approximate calories when you don't know exactly">
+    > "I had a restaurant burger — probably around 800 calories. Log it as dinner."
+
+    instant-db stores whatever you give it. Precision is up to you.
+  </Accordion>
+
+  <Accordion title="Set a daily calorie goal and track it">
+    Ask Claude to check your progress against a target:
+
+    > "My daily goal is 2,000 calories. How am I doing today, and how many calories do I have left?"
+
+    Claude will query your `diary_entries` for today, sum the calories, and do the math.
+  </Accordion>
+
+  <Accordion title="Add context with notes">
+    The `notes` field is useful for patterns you want to look back on:
+
+    > "Log dinner as 600 calories, notes: 'ate late, wasn't that hungry'"
+
+    Later: "Show me entries where I noted I wasn't hungry."
+  </Accordion>
+
+  <Accordion title="Start a new session mid-week">
+    Claude doesn't have memory of previous conversations by default. Start sessions with:
+
+    > "Describe my calories database and then tell me my total calories for the last 3 days."
+
+    This gives Claude the schema it needs before it starts querying.
+  </Accordion>
+</AccordionGroup>
+
+---
+
+## What you've built
+
+You now have a personal calorie diary that:
+
+- Stores a reusable food library with full macro data
+- Logs every meal with date, type, food, servings, and calories
+- Answers arbitrary natural-language questions about your eating history
+- Persists forever across every Claude session
+- Lives entirely on your machine
+
+The SQLite file is at `data/calories.sqlite`. You can open it directly in [DB Browser for SQLite](https://sqlitebrowser.org/) to browse your data outside of Claude, export it as CSV, or run raw SQL queries.
+
+<CardGroup cols={2}>
+  <Card title="Tool Reference" icon="wrench" href="/reference/tools">
+    See every tool available and its parameters
+  </Card>
+  <Card title="Schema Types" icon="table" href="/reference/schema-types">
+    Learn about column types and how to model data
+  </Card>
+</CardGroup>

@@ -1,0 +1,140 @@
+---
+title: "Schema Types"
+description: "The four column types instant-db supports and how they map to SQLite storage."
+icon: "table"
+---
+
+instant-db supports four column types. They map directly to SQLite's type affinity system.
+
+---
+
+## Types
+
+| instant-db type | SQLite affinity | Use for |
+|---|---|---|
+| `text` | TEXT | Names, descriptions, dates (as strings), free text |
+| `integer` | INTEGER | Counts, IDs, whole numbers, booleans (see below) |
+| `real` | REAL | Weights, prices, measurements, any decimal value |
+| `boolean` | INTEGER (0/1) | Flags, yes/no fields |
+
+<Note>
+  SQLite stores booleans as integers (0 = false, 1 = true). When Claude inserts a boolean value, it is converted automatically.
+</Note>
+
+---
+
+## Dates and times
+
+There is no native `date` or `timestamp` type. The recommended approach is `text` with [ISO 8601](https://en.wikipedia.org/wiki/ISO_8601) format strings (`YYYY-MM-DD` or `YYYY-MM-DDTHH:mm:ssZ`).
+
+ISO 8601 strings sort correctly as text, so `orderBy` on a date column works as expected.
+
+```
+Good:  "2024-01-15"
+Good:  "2024-01-15T08:30:00Z"
+Avoid: "January 15, 2024"   ← doesn't sort correctly
+Avoid: 1705305600           ← Unix timestamp, harder to read in queries
+```
+
+---
+
+## The `id` column
+
+Every table gets an `id INTEGER PRIMARY KEY AUTOINCREMENT` column automatically, unless you explicitly define a column with `primaryKey: true` in your schema. You never need to include `id` when inserting records.
+
+---
+
+## Column definition reference
+
+```typescript
+interface ColumnDef {
+  name: string;
+  type: "text" | "integer" | "real" | "boolean";
+  required?: boolean;   // Adds NOT NULL constraint
+  primaryKey?: boolean; // Marks as PRIMARY KEY AUTOINCREMENT
+}
+```
+
+---
+
+## Examples
+
+<AccordionGroup>
+  <Accordion title="Workout tracker schema">
+    ```json
+    [
+      {
+        "name": "exercises",
+        "columns": [
+          { "name": "name", "type": "text", "required": true },
+          { "name": "category", "type": "text" },
+          { "name": "notes", "type": "text" }
+        ]
+      },
+      {
+        "name": "workout_logs",
+        "columns": [
+          { "name": "date", "type": "text", "required": true },
+          { "name": "exercise", "type": "text", "required": true },
+          { "name": "sets", "type": "integer" },
+          { "name": "reps", "type": "integer" },
+          { "name": "weight_lbs", "type": "real" },
+          { "name": "mood", "type": "text" }
+        ]
+      }
+    ]
+    ```
+  </Accordion>
+
+  <Accordion title="Calorie diary schema">
+    ```json
+    [
+      {
+        "name": "foods",
+        "columns": [
+          { "name": "name", "type": "text", "required": true },
+          { "name": "calories_per_serving", "type": "integer", "required": true },
+          { "name": "serving_size", "type": "text" },
+          { "name": "protein_g", "type": "real" },
+          { "name": "carbs_g", "type": "real" },
+          { "name": "fat_g", "type": "real" }
+        ]
+      },
+      {
+        "name": "diary_entries",
+        "columns": [
+          { "name": "date", "type": "text", "required": true },
+          { "name": "meal", "type": "text", "required": true },
+          { "name": "food", "type": "text", "required": true },
+          { "name": "servings", "type": "real", "required": true },
+          { "name": "calories", "type": "integer", "required": true },
+          { "name": "notes", "type": "text" }
+        ]
+      }
+    ]
+    ```
+  </Accordion>
+
+  <Accordion title="Finance tracker schema">
+    ```json
+    [
+      {
+        "name": "categories",
+        "columns": [
+          { "name": "name", "type": "text", "required": true }
+        ]
+      },
+      {
+        "name": "transactions",
+        "columns": [
+          { "name": "date", "type": "text", "required": true },
+          { "name": "description", "type": "text", "required": true },
+          { "name": "amount", "type": "real", "required": true },
+          { "name": "category", "type": "text" },
+          { "name": "type", "type": "text", "required": true }
+        ]
+      }
+    ]
+    ```
+  </Accordion>
+</AccordionGroup>
