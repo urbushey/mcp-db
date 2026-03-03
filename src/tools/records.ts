@@ -3,6 +3,10 @@ import type { DatabaseRegistry } from "../db/registry.ts";
 import type { Logger } from "../logger.ts";
 import type { QueryFilter, QueryOptions } from "../db/adapter.ts";
 
+type ToolServer = {
+  tool: (name: string, description: string, schema: object, handler: (args: unknown) => Promise<unknown>) => void;
+};
+
 const QueryFilterSchema = z.object({
   column: z.string(),
   operator: z.enum(["=", "!=", ">", "<", ">=", "<=", "like"]),
@@ -11,51 +15,30 @@ const QueryFilterSchema = z.object({
 
 const QueryOptionsSchema = z.object({
   filters: z.array(QueryFilterSchema).optional(),
-  orderBy: z
-    .object({
-      column: z.string(),
-      direction: z.enum(["asc", "desc"]),
-    })
-    .optional(),
+  orderBy: z.object({ column: z.string(), direction: z.enum(["asc", "desc"]) }).optional(),
   limit: z.number().int().positive().optional(),
 });
 
 function getAdapter(registry: DatabaseRegistry, database: string) {
-  if (!registry.exists(database)) {
-    throw new Error(`Database "${database}" does not exist`);
-  }
+  if (!registry.exists(database)) throw new Error(`Database "${database}" does not exist`);
   return registry.get(database);
 }
 
 function errorResponse(message: string) {
-  return {
-    content: [{ type: "text", text: JSON.stringify({ error: message }) }],
-    isError: true,
-  };
+  return { content: [{ type: "text", text: JSON.stringify({ error: message }) }], isError: true };
 }
 
-export function registerRecordTools(
-  server: { tool: (name: string, schema: object, handler: (args: unknown) => Promise<unknown>) => void },
-  registry: DatabaseRegistry,
-  logger: Logger
-) {
-  // insert_record
+export function registerRecordTools(server: ToolServer, registry: DatabaseRegistry, logger: Logger) {
   server.tool(
     "insert_record",
-    {
-      description: "Insert a single record into a table. Returns the new row's ID.",
-      inputSchema: z.object({
-        database: z.string(),
-        table: z.string(),
-        record: z.record(z.unknown()),
-      }),
-    },
+    "Insert a single record into a table. Returns the new row's ID.",
+    z.object({
+      database: z.string(),
+      table: z.string(),
+      record: z.record(z.string(), z.unknown()),
+    }),
     async (args: unknown) => {
-      const { database, table, record } = args as {
-        database: string;
-        table: string;
-        record: Record<string, unknown>;
-      };
+      const { database, table, record } = args as { database: string; table: string; record: Record<string, unknown> };
       return logger.wrap("insert_record", args, async () => {
         try {
           const adapter = getAdapter(registry, database);
@@ -68,30 +51,21 @@ export function registerRecordTools(
     }
   );
 
-  // query_records
   server.tool(
     "query_records",
-    {
-      description: "Query records with optional filters, ordering, and limit.",
-      inputSchema: z.object({
-        database: z.string(),
-        table: z.string(),
-        options: QueryOptionsSchema.optional().default({}),
-      }),
-    },
+    "Query records with optional filters, ordering, and limit.",
+    z.object({
+      database: z.string(),
+      table: z.string(),
+      options: QueryOptionsSchema.optional().default({}),
+    }),
     async (args: unknown) => {
-      const { database, table, options } = args as {
-        database: string;
-        table: string;
-        options: QueryOptions;
-      };
+      const { database, table, options } = args as { database: string; table: string; options: QueryOptions };
       return logger.wrap("query_records", args, async () => {
         try {
           const adapter = getAdapter(registry, database);
           const records = await adapter.query(table, options ?? {});
-          return {
-            content: [{ type: "text", text: JSON.stringify({ records, count: records.length }) }],
-          };
+          return { content: [{ type: "text", text: JSON.stringify({ records, count: records.length }) }] };
         } catch (err) {
           return errorResponse(err instanceof Error ? err.message : String(err));
         }
@@ -99,25 +73,17 @@ export function registerRecordTools(
     }
   );
 
-  // update_record
   server.tool(
     "update_record",
-    {
-      description: "Update a record by ID.",
-      inputSchema: z.object({
-        database: z.string(),
-        table: z.string(),
-        id: z.number().int(),
-        updates: z.record(z.unknown()),
-      }),
-    },
+    "Update a record by ID.",
+    z.object({
+      database: z.string(),
+      table: z.string(),
+      id: z.number().int(),
+      updates: z.record(z.string(), z.unknown()),
+    }),
     async (args: unknown) => {
-      const { database, table, id, updates } = args as {
-        database: string;
-        table: string;
-        id: number;
-        updates: Record<string, unknown>;
-      };
+      const { database, table, id, updates } = args as { database: string; table: string; id: number; updates: Record<string, unknown> };
       return logger.wrap("update_record", args, async () => {
         try {
           const adapter = getAdapter(registry, database);
@@ -130,17 +96,10 @@ export function registerRecordTools(
     }
   );
 
-  // delete_record
   server.tool(
     "delete_record",
-    {
-      description: "Delete a record by ID.",
-      inputSchema: z.object({
-        database: z.string(),
-        table: z.string(),
-        id: z.number().int(),
-      }),
-    },
+    "Delete a record by ID.",
+    z.object({ database: z.string(), table: z.string(), id: z.number().int() }),
     async (args: unknown) => {
       const { database, table, id } = args as { database: string; table: string; id: number };
       return logger.wrap("delete_record", args, async () => {
@@ -155,23 +114,16 @@ export function registerRecordTools(
     }
   );
 
-  // count_records
   server.tool(
     "count_records",
-    {
-      description: "Count records in a table, optionally filtered.",
-      inputSchema: z.object({
-        database: z.string(),
-        table: z.string(),
-        filters: z.array(QueryFilterSchema).optional(),
-      }),
-    },
+    "Count records in a table, optionally filtered.",
+    z.object({
+      database: z.string(),
+      table: z.string(),
+      filters: z.array(QueryFilterSchema).optional(),
+    }),
     async (args: unknown) => {
-      const { database, table, filters } = args as {
-        database: string;
-        table: string;
-        filters?: QueryFilter[];
-      };
+      const { database, table, filters } = args as { database: string; table: string; filters?: QueryFilter[] };
       return logger.wrap("count_records", args, async () => {
         try {
           const adapter = getAdapter(registry, database);

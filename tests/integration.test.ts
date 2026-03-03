@@ -21,7 +21,7 @@ function cleanup() {
 function makeFakeServer() {
   const tools: Record<string, (args: unknown) => Promise<unknown>> = {};
   return {
-    tool(name: string, _schema: object, handler: (args: unknown) => Promise<unknown>) {
+    tool(name: string, _desc: string, _schema: object, handler: (args: unknown) => Promise<unknown>) {
       tools[name] = handler;
     },
     call(name: string, args: unknown) {
