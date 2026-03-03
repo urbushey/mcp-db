@@ -9,7 +9,6 @@
     "test": "bun test"
   },
   "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
     "@types/bun": "latest"
   },
   "peerDependencies": {
@@ -17,7 +16,6 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
-    "better-sqlite3": "^12.6.2",
     "drizzle-orm": "^0.45.1",
     "zod": "^4.3.6"
   }
