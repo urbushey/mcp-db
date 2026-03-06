@@ -40,3 +40,12 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Finder (MacOS) folder config
 .DS_Store
+
+# Local MCP config
+.mcp.json
+
+# Claude config
+.claude
+
+# Spec files (local only)
+spec/

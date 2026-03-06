@@ -32,11 +32,11 @@ export function registerRecordTools(server: ToolServer, registry: DatabaseRegist
   server.tool(
     "insert_record",
     "Insert a single record into a table. Returns the new row's ID.",
-    z.object({
+    {
       database: z.string(),
       table: z.string(),
       record: z.record(z.string(), z.unknown()),
-    }),
+    },
     async (args: unknown) => {
       const { database, table, record } = args as { database: string; table: string; record: Record<string, unknown> };
       return logger.wrap("insert_record", args, async () => {
@@ -54,11 +54,11 @@ export function registerRecordTools(server: ToolServer, registry: DatabaseRegist
   server.tool(
     "query_records",
     "Query records with optional filters, ordering, and limit.",
-    z.object({
+    {
       database: z.string(),
       table: z.string(),
       options: QueryOptionsSchema.optional().default({}),
-    }),
+    },
     async (args: unknown) => {
       const { database, table, options } = args as { database: string; table: string; options: QueryOptions };
       return logger.wrap("query_records", args, async () => {
@@ -76,12 +76,12 @@ export function registerRecordTools(server: ToolServer, registry: DatabaseRegist
   server.tool(
     "update_record",
     "Update a record by ID.",
-    z.object({
+    {
       database: z.string(),
       table: z.string(),
       id: z.number().int(),
       updates: z.record(z.string(), z.unknown()),
-    }),
+    },
     async (args: unknown) => {
       const { database, table, id, updates } = args as { database: string; table: string; id: number; updates: Record<string, unknown> };
       return logger.wrap("update_record", args, async () => {
@@ -99,7 +99,7 @@ export function registerRecordTools(server: ToolServer, registry: DatabaseRegist
   server.tool(
     "delete_record",
     "Delete a record by ID.",
-    z.object({ database: z.string(), table: z.string(), id: z.number().int() }),
+    { database: z.string(), table: z.string(), id: z.number().int() },
     async (args: unknown) => {
       const { database, table, id } = args as { database: string; table: string; id: number };
       return logger.wrap("delete_record", args, async () => {
@@ -117,11 +117,11 @@ export function registerRecordTools(server: ToolServer, registry: DatabaseRegist
   server.tool(
     "count_records",
     "Count records in a table, optionally filtered.",
-    z.object({
+    {
       database: z.string(),
       table: z.string(),
       filters: z.array(QueryFilterSchema).optional(),
-    }),
+    },
     async (args: unknown) => {
       const { database, table, filters } = args as { database: string; table: string; filters?: QueryFilter[] };
       return logger.wrap("count_records", args, async () => {
