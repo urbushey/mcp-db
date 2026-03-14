@@ -55,6 +55,12 @@ export class DatabaseRegistry {
   }
 
   async create(name: string): Promise<IDbAdapter> {
+    if (!name || typeof name !== "string" || name.trim().length === 0) {
+      throw new Error("Database name must be a non-empty string");
+    }
+    if (/[/\\]|\.\./.test(name)) {
+      throw new Error("Database name contains unsafe characters");
+    }
     if (this.exists(name)) {
       throw new Error(`Database "${name}" already exists`);
     }

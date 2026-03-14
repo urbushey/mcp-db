@@ -41,6 +41,29 @@ describe("DatabaseRegistry", () => {
     expect(() => registry.get("missing")).toThrow(/does not exist/);
   });
 
+  it("rejects undefined/null name", () => {
+    const registry = new DatabaseRegistry(TEST_DIR);
+    expect(() => registry.create(undefined as unknown as string)).toThrow(/non-empty string/);
+    expect(() => registry.create(null as unknown as string)).toThrow(/non-empty string/);
+  });
+
+  it("rejects empty string name", () => {
+    const registry = new DatabaseRegistry(TEST_DIR);
+    expect(() => registry.create("")).toThrow(/non-empty string/);
+  });
+
+  it("rejects whitespace-only name", () => {
+    const registry = new DatabaseRegistry(TEST_DIR);
+    expect(() => registry.create("   ")).toThrow(/non-empty string/);
+  });
+
+  it("rejects names with filesystem-unsafe characters", () => {
+    const registry = new DatabaseRegistry(TEST_DIR);
+    expect(() => registry.create("foo/bar")).toThrow(/unsafe characters/);
+    expect(() => registry.create("foo\\bar")).toThrow(/unsafe characters/);
+    expect(() => registry.create("foo..bar")).toThrow(/unsafe characters/);
+  });
+
   it("returns a working adapter", async () => {
     const registry = new DatabaseRegistry(TEST_DIR);
     const adapter = await registry.create("testdb");
