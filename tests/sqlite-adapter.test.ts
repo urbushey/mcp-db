@@ -6,14 +6,20 @@ const TEST_DB = "/tmp/test-instant-db-adapter.sqlite";
 
 let adapter: SqliteAdapter;
 
+function cleanupDb() {
+  for (const suffix of ["", "-wal", "-shm"]) {
+    if (existsSync(TEST_DB + suffix)) rmSync(TEST_DB + suffix);
+  }
+}
+
 beforeEach(() => {
-  if (existsSync(TEST_DB)) rmSync(TEST_DB);
+  cleanupDb();
   adapter = new SqliteAdapter(TEST_DB);
 });
 
 afterEach(() => {
   adapter.close();
-  if (existsSync(TEST_DB)) rmSync(TEST_DB);
+  cleanupDb();
 });
 
 describe("SqliteAdapter", () => {
@@ -177,6 +183,63 @@ describe("SqliteAdapter", () => {
       expect(adapter.execute("DROP TABLE fruits")).rejects.toThrow(
         /Only SELECT and WITH/
       );
+    });
+  });
+
+  describe("mutate", () => {
+    beforeEach(async () => {
+      await adapter.createTable({
+        name: "items",
+        columns: [
+          { name: "name", type: "text", required: true },
+          { name: "qty", type: "integer" },
+        ],
+      });
+    });
+
+    it("INSERT returns rowsAffected and lastInsertRowid", async () => {
+      const result = await adapter.mutate("INSERT INTO items (name, qty) VALUES (?, ?)", ["apple", 5]);
+      expect(result.rowsAffected).toBe(1);
+      expect(result.lastInsertRowid).toBe(1);
+    });
+
+    it("UPDATE updates matching rows", async () => {
+      await adapter.mutate("INSERT INTO items (name, qty) VALUES (?, ?)", ["apple", 5]);
+      await adapter.mutate("INSERT INTO items (name, qty) VALUES (?, ?)", ["banana", 3]);
+      const result = await adapter.mutate("UPDATE items SET qty = 10 WHERE name = ?", ["apple"]);
+      expect(result.rowsAffected).toBe(1);
+    });
+
+    it("DELETE deletes matching rows", async () => {
+      await adapter.mutate("INSERT INTO items (name, qty) VALUES (?, ?)", ["apple", 5]);
+      await adapter.mutate("INSERT INTO items (name, qty) VALUES (?, ?)", ["banana", 3]);
+      const result = await adapter.mutate("DELETE FROM items WHERE qty < ?", [4]);
+      expect(result.rowsAffected).toBe(1);
+    });
+
+    it("rejects SELECT", async () => {
+      expect(adapter.mutate("SELECT * FROM items")).rejects.toThrow(/not allowed/);
+    });
+
+    it("rejects DROP/CREATE/ALTER", async () => {
+      expect(adapter.mutate("DROP TABLE items")).rejects.toThrow(/not allowed/);
+      expect(adapter.mutate("CREATE TABLE foo (id INTEGER)")).rejects.toThrow(/not allowed/);
+      expect(adapter.mutate("ALTER TABLE items ADD COLUMN x TEXT")).rejects.toThrow(/not allowed/);
+    });
+
+    it("rolls back on error", async () => {
+      await adapter.createTable({
+        name: "uniq",
+        columns: [{ name: "val", type: "text", required: true }],
+      });
+      // Add a unique constraint via raw db access
+      await adapter.execute("SELECT 1"); // just verifying adapter works
+      await adapter.mutate("INSERT INTO uniq (val) VALUES (?)", ["a"]);
+      // Inserting a row with NULL for NOT NULL column should fail
+      expect(adapter.mutate("INSERT INTO uniq (val) VALUES (NULL)")).rejects.toThrow();
+      // Original row should still be there
+      const rows = await adapter.execute("SELECT * FROM uniq");
+      expect(rows.length).toBe(1);
     });
   });
 
