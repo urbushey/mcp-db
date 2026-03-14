@@ -129,6 +129,25 @@ export class SqliteAdapter implements IDbAdapter {
     return row.cnt;
   }
 
+  async mutate(sql: string, params: (string | number | boolean)[] = []): Promise<{ rowsAffected: number; lastInsertRowid: number }> {
+    const prefix = sql.trimStart().toUpperCase();
+    const allowed = ["INSERT", "UPDATE", "DELETE"];
+    const rejected = ["SELECT", "CREATE", "DROP", "ALTER", "TRUNCATE"];
+
+    if (rejected.some((k) => prefix.startsWith(k))) {
+      throw new Error(`Statement type not allowed. Only INSERT, UPDATE, DELETE are permitted.`);
+    }
+    if (!allowed.some((k) => prefix.startsWith(k))) {
+      throw new Error(`Statement type not allowed. Only INSERT, UPDATE, DELETE are permitted.`);
+    }
+
+    const txn = this.db.transaction(() => {
+      return this.db.query(sql).run(...params);
+    });
+    const result = txn();
+    return { rowsAffected: result.changes, lastInsertRowid: Number(result.lastInsertRowid) };
+  }
+
   async execute(sql: string, params: (string | number | boolean)[] = []): Promise<Record<string, unknown>[]> {
     const prefix = sql.trimStart().toUpperCase();
     if (!prefix.startsWith("SELECT") && !prefix.startsWith("WITH")) {

@@ -37,4 +37,7 @@ export interface IDbAdapter {
 
   // Raw SQL (SELECT/WITH only)
   execute(sql: string, params?: (string | number | boolean)[]): Promise<Record<string, unknown>[]>;
+
+  // Raw DML (INSERT/UPDATE/DELETE only)
+  mutate(sql: string, params?: (string | number | boolean)[]): Promise<{ rowsAffected: number; lastInsertRowid: number }>;
 }
