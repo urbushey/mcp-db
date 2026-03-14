@@ -129,6 +129,14 @@ export class SqliteAdapter implements IDbAdapter {
     return row.cnt;
   }
 
+  async execute(sql: string, params: (string | number | boolean)[] = []): Promise<Record<string, unknown>[]> {
+    const prefix = sql.trimStart().toUpperCase();
+    if (!prefix.startsWith("SELECT") && !prefix.startsWith("WITH")) {
+      throw new Error("Only SELECT and WITH (CTE) statements are allowed");
+    }
+    return this.db.query(sql).all(...params) as Record<string, unknown>[];
+  }
+
   private mapSqliteType(sqliteType: string): "text" | "integer" | "real" | "boolean" {
     const t = sqliteType.toUpperCase();
     if (t.includes("INT")) return "integer";
