@@ -41,37 +41,6 @@ describe("schema tools", () => {
     registerSchemaTools(server, registry, logger);
   });
 
-  describe("propose_schema", () => {
-    it("returns description and tables structure", async () => {
-      const result = await server.call("propose_schema", {
-        description: "I want to track workouts",
-      }) as { content: { text: string }[] };
-
-      const data = JSON.parse(result.content[0]!.text);
-      expect(data.description).toBe("I want to track workouts");
-      expect(Array.isArray(data.tables)).toBe(true);
-      expect(typeof data.summary).toBe("string");
-    });
-
-    it("returns existing_proposal when provided", async () => {
-      const existing = [
-        {
-          name: "exercises",
-          columns: [{ name: "name", type: "text", required: true }],
-        },
-      ];
-
-      const result = await server.call("propose_schema", {
-        description: "Add a notes field",
-        existing_proposal: existing,
-      }) as { content: { text: string }[] };
-
-      const data = JSON.parse(result.content[0]!.text);
-      expect(data.tables).toHaveLength(1);
-      expect(data.tables[0].name).toBe("exercises");
-    });
-  });
-
   describe("create_database", () => {
     it("creates a database with tables", async () => {
       const result = await server.call("create_database", {

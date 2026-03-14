@@ -55,14 +55,7 @@ describe("Integration: workout tracker", () => {
     let data = JSON.parse(res.content[0]!.text);
     expect(data.databases).toEqual([]);
 
-    // 2. Propose a schema
-    res = await server.call("propose_schema", {
-      description: "I want to track my workouts — exercises, sets, reps, and weights",
-    }) as McpResult;
-    data = JSON.parse(res.content[0]!.text);
-    expect(data.description).toContain("workouts");
-
-    // 3. Create the database with confirmed schema
+    // 2. Create the database with confirmed schema
     res = await server.call("create_database", {
       database: "workouts",
       tables: [
@@ -89,19 +82,19 @@ describe("Integration: workout tracker", () => {
     data = JSON.parse(res.content[0]!.text);
     expect(data.success).toBe(true);
 
-    // 4. List databases — should now include "workouts"
+    // 3. List databases — should now include "workouts"
     res = await server.call("list_databases", {}) as McpResult;
     data = JSON.parse(res.content[0]!.text);
     expect(data.databases).toContain("workouts");
 
-    // 5. Describe the database
+    // 4. Describe the database
     res = await server.call("describe_database", { database: "workouts" }) as McpResult;
     data = JSON.parse(res.content[0]!.text);
     const tableNames = data.tables.map((t: { name: string }) => t.name);
     expect(tableNames).toContain("exercises");
     expect(tableNames).toContain("workout_logs");
 
-    // 6. Insert an exercise
+    // 5. Insert an exercise
     res = await server.call("insert_record", {
       database: "workouts",
       table: "exercises",
@@ -110,7 +103,7 @@ describe("Integration: workout tracker", () => {
     data = JSON.parse(res.content[0]!.text);
     expect(data.id).toBe(1);
 
-    // 7. Log a workout
+    // 6. Log a workout
     res = await server.call("insert_record", {
       database: "workouts",
       table: "workout_logs",
@@ -127,7 +120,7 @@ describe("Integration: workout tracker", () => {
     const logId = data.id as number;
     expect(logId).toBe(1);
 
-    // 8. Query all workout logs
+    // 7. Query all workout logs
     res = await server.call("query_records", {
       database: "workouts",
       table: "workout_logs",
@@ -138,7 +131,7 @@ describe("Integration: workout tracker", () => {
     expect(data.records[0].exercise).toBe("Squat");
     expect(data.records[0].weight_lbs).toBe(185);
 
-    // 9. Query with filter (mood = great)
+    // 8. Query with filter (mood = great)
     res = await server.call("query_records", {
       database: "workouts",
       table: "workout_logs",
@@ -147,7 +140,7 @@ describe("Integration: workout tracker", () => {
     data = JSON.parse(res.content[0]!.text);
     expect(data.count).toBe(1);
 
-    // 10. Update the weight
+    // 9. Update the weight
     res = await server.call("update_record", {
       database: "workouts",
       table: "workout_logs",
@@ -157,7 +150,7 @@ describe("Integration: workout tracker", () => {
     data = JSON.parse(res.content[0]!.text);
     expect(data.success).toBe(true);
 
-    // 11. Count records
+    // 10. Count records
     res = await server.call("count_records", {
       database: "workouts",
       table: "workout_logs",
@@ -165,7 +158,7 @@ describe("Integration: workout tracker", () => {
     data = JSON.parse(res.content[0]!.text);
     expect(data.count).toBe(1);
 
-    // 12. Delete the log
+    // 11. Delete the log
     res = await server.call("delete_record", {
       database: "workouts",
       table: "workout_logs",
@@ -174,7 +167,7 @@ describe("Integration: workout tracker", () => {
     data = JSON.parse(res.content[0]!.text);
     expect(data.success).toBe(true);
 
-    // 13. Count again — should be 0
+    // 12. Count again — should be 0
     res = await server.call("count_records", {
       database: "workouts",
       table: "workout_logs",

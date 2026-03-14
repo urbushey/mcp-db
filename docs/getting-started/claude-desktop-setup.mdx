@@ -64,7 +64,6 @@ You should see these tools available:
 
 - `list_databases`
 - `describe_database`
-- `propose_schema`
 - `create_database`
 - `insert_record`
 - `query_records`
@@ -83,8 +82,7 @@ You have access to an instant-db MCP server for persistent structured storage.
 When a user wants to track or store anything structured:
 
 1. Call list_databases first to check what already exists.
-2. If no relevant database exists, call propose_schema and present the proposal
-   conversationally — don't show raw JSON.
+2. If no relevant database exists, propose a schema conversationally.
 3. Wait for explicit confirmation before calling create_database.
 4. At the start of any session involving an existing database, call
    describe_database so you know the current schema before inserting or querying.

@@ -21,30 +21,6 @@ const TableSchemaInput = z.object({
 
 export function registerSchemaTools(server: ToolServer, registry: DatabaseRegistry, logger: Logger) {
   server.tool(
-    "propose_schema",
-    "Given a plain-language description, return a structured schema proposal. Does NOT create anything — only proposes. Present the result conversationally and wait for user confirmation.",
-    {
-      description: z.string().describe("Plain-language description of what the user wants to track"),
-      existing_proposal: z.array(TableSchemaInput).optional().describe("Existing proposal to iterate on"),
-    },
-    async (args: unknown) => {
-      const { description, existing_proposal } = args as {
-        description: string;
-        existing_proposal?: TableSchema[];
-      };
-      return logger.wrap("propose_schema", args, async () => {
-        const tables: TableSchema[] = existing_proposal ?? [];
-        const summary = existing_proposal
-          ? `Returning existing proposal for modification based on: "${description}"`
-          : `Schema proposal for: "${description}"`;
-        return {
-          content: [{ type: "text", text: JSON.stringify({ tables, summary, description }) }],
-        };
-      });
-    }
-  );
-
-  server.tool(
     "create_database",
     "Create a named database from a confirmed schema. Fails if the database already exists.",
     {
