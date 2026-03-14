@@ -129,6 +129,57 @@ describe("SqliteAdapter", () => {
     });
   });
 
+  describe("execute", () => {
+    beforeEach(async () => {
+      await adapter.createTable({
+        name: "fruits",
+        columns: [
+          { name: "name", type: "text", required: true },
+          { name: "weight", type: "real" },
+        ],
+      });
+      await adapter.insert("fruits", { name: "apple", weight: 0.3 });
+      await adapter.insert("fruits", { name: "banana", weight: 0.2 });
+    });
+
+    it("runs a SELECT query", async () => {
+      const rows = await adapter.execute("SELECT * FROM fruits");
+      expect(rows.length).toBe(2);
+    });
+
+    it("supports bind params", async () => {
+      const rows = await adapter.execute("SELECT * FROM fruits WHERE name = ?", ["apple"]);
+      expect(rows.length).toBe(1);
+      expect(rows[0]!["name"]).toBe("apple");
+    });
+
+    it("allows WITH (CTE) queries", async () => {
+      const rows = await adapter.execute(
+        "WITH heavy AS (SELECT * FROM fruits WHERE weight > 0.25) SELECT name FROM heavy"
+      );
+      expect(rows.length).toBe(1);
+      expect(rows[0]!["name"]).toBe("apple");
+    });
+
+    it("rejects INSERT", async () => {
+      expect(adapter.execute("INSERT INTO fruits (name) VALUES ('pear')")).rejects.toThrow(
+        /Only SELECT and WITH/
+      );
+    });
+
+    it("rejects DELETE", async () => {
+      expect(adapter.execute("DELETE FROM fruits WHERE id = 1")).rejects.toThrow(
+        /Only SELECT and WITH/
+      );
+    });
+
+    it("rejects DROP", async () => {
+      expect(adapter.execute("DROP TABLE fruits")).rejects.toThrow(
+        /Only SELECT and WITH/
+      );
+    });
+  });
+
   describe("count", () => {
     it("counts all records", async () => {
       await adapter.createTable({

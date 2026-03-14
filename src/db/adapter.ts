@@ -34,4 +34,7 @@ export interface IDbAdapter {
   update(table: string, id: number, record: Partial<Record<string, unknown>>): Promise<void>;
   delete(table: string, id: number): Promise<void>;
   count(table: string, filters?: QueryFilter[]): Promise<number>;
+
+  // Raw SQL (SELECT/WITH only)
+  execute(sql: string, params?: (string | number | boolean)[]): Promise<Record<string, unknown>[]>;
 }
