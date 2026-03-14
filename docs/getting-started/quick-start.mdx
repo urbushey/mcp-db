@@ -78,10 +78,9 @@ Once connected to Claude Desktop, open a new conversation and say:
 > "I want to track my daily water intake — date, glasses of water, and any notes."
 
 Claude will:
-1. Call `propose_schema` and describe the table structure to you
-2. Wait for your confirmation
-3. Call `create_database` to create it
-4. Be ready to insert and query records immediately
+1. Propose a table structure conversationally and wait for your confirmation
+2. Call `create_database` to create it
+3. Be ready to insert and query records immediately
 
 <Tip>
   Add the [recommended system prompt](/getting-started/claude-desktop-setup#system-prompt) to Claude so it automatically checks for existing databases at the start of each session.
