@@ -54,6 +54,12 @@ export function registerSchemaTools(server: ToolServer, registry: DatabaseRegist
     async (args: unknown) => {
       const { database, tables } = args as { database: string; tables: TableSchema[] };
       return logger.wrap("create_database", args, async () => {
+        if (!database || typeof database !== "string" || database.trim().length === 0) {
+          return {
+            content: [{ type: "text", text: JSON.stringify({ error: "Database name must be a non-empty string" }) }],
+            isError: true,
+          };
+        }
         if (registry.exists(database)) {
           return {
             content: [{ type: "text", text: JSON.stringify({ error: `Database "${database}" already exists` }) }],

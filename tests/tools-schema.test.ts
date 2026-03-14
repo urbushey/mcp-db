@@ -111,6 +111,17 @@ describe("schema tools", () => {
       expect(tables.map((t) => t.name)).toContain("workout_logs");
     });
 
+    it("returns error for empty/invalid name", async () => {
+      const result = await server.call("create_database", {
+        database: "",
+        tables: [],
+      }) as { isError: boolean; content: { text: string }[] };
+
+      expect(result.isError).toBe(true);
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.error).toMatch(/non-empty string/);
+    });
+
     it("returns error if database already exists", async () => {
       await registry.create("mydb");
 
