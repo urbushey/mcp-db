@@ -22,13 +22,14 @@ const TableSchemaInput = z.object({
 export function registerSchemaTools(server: ToolServer, registry: DatabaseRegistry, logger: Logger) {
   server.tool(
     "create_database",
-    "Create a named database from a confirmed schema. Fails if the database already exists.",
+    "Create a named database from a confirmed schema. Fails if the database already exists. After creating, consider using update_database_notes to record conventions and usage guidelines for future sessions.",
     {
       database: z.string().describe("The name for the new database"),
       tables: z.array(TableSchemaInput).describe("The confirmed table schemas"),
+      description: z.string().optional().describe("A short description of what this database is for"),
     },
     async (args: unknown) => {
-      const { database, tables } = args as { database: string; tables: TableSchema[] };
+      const { database, tables, description } = args as { database: string; tables: TableSchema[]; description?: string };
       return logger.wrap("create_database", args, async () => {
         if (!database || typeof database !== "string" || database.trim().length === 0) {
           return {
@@ -42,7 +43,7 @@ export function registerSchemaTools(server: ToolServer, registry: DatabaseRegist
             isError: true,
           };
         }
-        const adapter = await registry.create(database);
+        const adapter = await registry.create(database, description);
         for (const table of tables) {
           await adapter.createTable(table);
         }

@@ -91,6 +91,30 @@ describe("schema tools", () => {
       expect(data.error).toMatch(/non-empty string/);
     });
 
+    it("creates a database with description", async () => {
+      const result = await server.call("create_database", {
+        database: "meals",
+        tables: [{ name: "entries", columns: [{ name: "food", type: "text" }] }],
+        description: "Daily meal tracking",
+      }) as { content: { text: string }[] };
+
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.success).toBe(true);
+
+      const meta = registry.getMetadata("meals");
+      expect(meta.description).toBe("Daily meal tracking");
+    });
+
+    it("creates a database without description", async () => {
+      await server.call("create_database", {
+        database: "meals",
+        tables: [],
+      });
+
+      const meta = registry.getMetadata("meals");
+      expect(meta.description).toBeNull();
+    });
+
     it("returns error if database already exists", async () => {
       await registry.create("mydb");
 
