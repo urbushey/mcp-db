@@ -39,8 +39,24 @@ export function registerDatabaseTools(server: ToolServer, registry: DatabaseRegi
         const adapter = registry.get(database);
         const tables = await adapter.getTables();
         const { description, notes } = registry.getMetadata(database);
+        const fieldsMeta = registry.getFieldsMetadata(database);
+
+        // Merge field metadata into column definitions
+        const enrichedTables = tables.map((table) => ({
+          ...table,
+          columns: table.columns.map((col) => {
+            const meta = fieldsMeta.find((f) => f.table_name === table.name && f.column_name === col.name);
+            if (!meta) return col;
+            return {
+              ...col,
+              ...(meta.display_name != null ? { displayName: meta.display_name } : {}),
+              ...(meta.description != null ? { description: meta.description } : {}),
+            };
+          }),
+        }));
+
         return {
-          content: [{ type: "text", text: JSON.stringify({ description, notes, tables }) }],
+          content: [{ type: "text", text: JSON.stringify({ description, notes, tables: enrichedTables }) }],
         };
       });
     }
@@ -65,6 +81,35 @@ export function registerDatabaseTools(server: ToolServer, registry: DatabaseRegi
         registry.updateNotes(database, notes);
         return {
           content: [{ type: "text", text: JSON.stringify({ success: true, database }) }],
+        };
+      });
+    }
+  );
+
+  server.tool(
+    "update_field_metadata",
+    "Set a display name and/or description on a column. Use this to document what a field means, its valid values, units, or formatting rules. Field metadata is returned by describe_database.",
+    {
+      database: z.string().describe("The name of the database"),
+      table: z.string().describe("The table name"),
+      column: z.string().describe("The column name"),
+      displayName: z.string().optional().describe("Human-readable display name (e.g. 'Saturated Fat (g)')"),
+      description: z.string().optional().describe("What this field means, valid values, units, etc."),
+    },
+    async (args: unknown) => {
+      const { database, table, column, displayName, description } = args as {
+        database: string; table: string; column: string; displayName?: string; description?: string;
+      };
+      return logger.wrap("update_field_metadata", args, async () => {
+        if (!registry.exists(database)) {
+          return {
+            content: [{ type: "text", text: JSON.stringify({ error: `Database "${database}" does not exist` }) }],
+            isError: true,
+          };
+        }
+        registry.updateFieldMetadata(database, table, column, displayName, description);
+        return {
+          content: [{ type: "text", text: JSON.stringify({ success: true, database, table, column }) }],
         };
       });
     }

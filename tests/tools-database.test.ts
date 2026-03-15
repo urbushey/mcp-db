@@ -140,4 +140,107 @@ describe("database tools", () => {
       expect(data.error).toMatch(/does not exist/);
     });
   });
+
+  describe("describe_database with field metadata", () => {
+    it("includes field metadata on columns", async () => {
+      const adapter = await registry.create("mydb");
+      await adapter.createTable({
+        name: "meals",
+        columns: [
+          { name: "meal_type", type: "text", required: true },
+          { name: "calories", type: "integer" },
+        ],
+      });
+      registry.updateFieldMetadata("mydb", "meals", "meal_type", "Meal", "One of: breakfast, lunch, dinner, snack");
+      registry.updateFieldMetadata("mydb", "meals", "calories", "Calories", "Integer kcal");
+
+      const result = await server.call("describe_database", { database: "mydb" }) as { content: { text: string }[] };
+      const data = JSON.parse(result.content[0]!.text);
+      const mealTypeCol = data.tables[0].columns.find((c: any) => c.name === "meal_type");
+      const calCol = data.tables[0].columns.find((c: any) => c.name === "calories");
+      expect(mealTypeCol.displayName).toBe("Meal");
+      expect(mealTypeCol.description).toBe("One of: breakfast, lunch, dinner, snack");
+      expect(calCol.displayName).toBe("Calories");
+      expect(calCol.description).toBe("Integer kcal");
+    });
+
+    it("omits displayName/description when not set", async () => {
+      const adapter = await registry.create("mydb");
+      await adapter.createTable({
+        name: "meals",
+        columns: [{ name: "cal", type: "integer" }],
+      });
+
+      const result = await server.call("describe_database", { database: "mydb" }) as { content: { text: string }[] };
+      const data = JSON.parse(result.content[0]!.text);
+      const col = data.tables[0].columns.find((c: any) => c.name === "cal");
+      expect(col.displayName).toBeUndefined();
+      expect(col.description).toBeUndefined();
+    });
+  });
+
+  describe("update_field_metadata", () => {
+    it("sets field metadata", async () => {
+      await registry.create("mydb");
+
+      const result = await server.call("update_field_metadata", {
+        database: "mydb",
+        table: "meals",
+        column: "meal_type",
+        displayName: "Meal",
+        description: "One of: breakfast, lunch, dinner, snack",
+      }) as { content: { text: string }[] };
+
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.success).toBe(true);
+
+      const fields = registry.getFieldsMetadata("mydb");
+      expect(fields).toHaveLength(1);
+      expect(fields[0].display_name).toBe("Meal");
+      expect(fields[0].description).toBe("One of: breakfast, lunch, dinner, snack");
+    });
+
+    it("works with only displayName", async () => {
+      await registry.create("mydb");
+
+      await server.call("update_field_metadata", {
+        database: "mydb",
+        table: "meals",
+        column: "cal",
+        displayName: "Calories",
+      });
+
+      const fields = registry.getFieldsMetadata("mydb");
+      expect(fields[0].display_name).toBe("Calories");
+      expect(fields[0].description).toBeNull();
+    });
+
+    it("works with only description", async () => {
+      await registry.create("mydb");
+
+      await server.call("update_field_metadata", {
+        database: "mydb",
+        table: "meals",
+        column: "cal",
+        description: "Integer kcal",
+      });
+
+      const fields = registry.getFieldsMetadata("mydb");
+      expect(fields[0].display_name).toBeNull();
+      expect(fields[0].description).toBe("Integer kcal");
+    });
+
+    it("returns error for unknown database", async () => {
+      const result = await server.call("update_field_metadata", {
+        database: "missing",
+        table: "t",
+        column: "c",
+        displayName: "X",
+      }) as { isError: boolean; content: { text: string }[] };
+
+      expect(result.isError).toBe(true);
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.error).toMatch(/does not exist/);
+    });
+  });
 });

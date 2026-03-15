@@ -116,6 +116,28 @@ export class DatabaseRegistry {
     this.metaDb.run("UPDATE databases SET notes = ? WHERE name = ?", [notes, name]);
   }
 
+  getFieldsMetadata(database: string): { table_name: string; column_name: string; display_name: string | null; description: string | null }[] {
+    if (!this.exists(database)) {
+      throw new Error(`Database "${database}" does not exist`);
+    }
+    return this.metaDb.query(
+      "SELECT table_name, column_name, display_name, description FROM fields WHERE database_name = ?"
+    ).all(database) as { table_name: string; column_name: string; display_name: string | null; description: string | null }[];
+  }
+
+  updateFieldMetadata(database: string, table: string, column: string, displayName?: string, description?: string): void {
+    if (!this.exists(database)) {
+      throw new Error(`Database "${database}" does not exist`);
+    }
+    this.metaDb.run(
+      `INSERT INTO fields (database_name, table_name, column_name, display_name, description)
+       VALUES (?, ?, ?, ?, ?)
+       ON CONFLICT (database_name, table_name, column_name)
+       DO UPDATE SET display_name = ?, description = ?`,
+      [database, table, column, displayName ?? null, description ?? null, displayName ?? null, description ?? null]
+    );
+  }
+
   async create(name: string, description?: string): Promise<IDbAdapter> {
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       throw new Error("Database name must be a non-empty string");

@@ -127,5 +127,41 @@ describe("schema tools", () => {
       const data = JSON.parse(result.content[0]!.text);
       expect(data.error).toMatch(/already exists/);
     });
+
+    it("stores field metadata from column definitions", async () => {
+      await server.call("create_database", {
+        database: "meals",
+        tables: [{
+          name: "diary",
+          columns: [
+            { name: "meal_type", type: "text", required: true, displayName: "Meal", description: "breakfast/lunch/dinner/snack" },
+            { name: "calories", type: "integer", displayName: "Calories" },
+            { name: "notes", type: "text" },
+          ],
+        }],
+      });
+
+      const fields = registry.getFieldsMetadata("meals");
+      expect(fields).toHaveLength(2); // only columns with metadata
+      const mealType = fields.find(f => f.column_name === "meal_type");
+      const cal = fields.find(f => f.column_name === "calories");
+      expect(mealType!.display_name).toBe("Meal");
+      expect(mealType!.description).toBe("breakfast/lunch/dinner/snack");
+      expect(cal!.display_name).toBe("Calories");
+      expect(cal!.description).toBeNull();
+    });
+
+    it("creates database without field metadata when none provided", async () => {
+      await server.call("create_database", {
+        database: "meals",
+        tables: [{
+          name: "diary",
+          columns: [{ name: "cal", type: "integer" }],
+        }],
+      });
+
+      const fields = registry.getFieldsMetadata("meals");
+      expect(fields).toEqual([]);
+    });
   });
 });

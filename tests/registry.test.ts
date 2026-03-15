@@ -159,6 +159,80 @@ describe("DatabaseRegistry", () => {
     });
   });
 
+  describe("field metadata", () => {
+    it("updateFieldMetadata upserts field metadata", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("mydb");
+      registry.updateFieldMetadata("mydb", "meals", "meal_type", "Meal", "One of: breakfast, lunch, dinner, snack");
+      const fields = registry.getFieldsMetadata("mydb");
+      expect(fields).toHaveLength(1);
+      expect(fields[0]).toEqual({
+        table_name: "meals",
+        column_name: "meal_type",
+        display_name: "Meal",
+        description: "One of: breakfast, lunch, dinner, snack",
+      });
+    });
+
+    it("updateFieldMetadata replaces existing metadata", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("mydb");
+      registry.updateFieldMetadata("mydb", "meals", "cal", "Calories", "v1");
+      registry.updateFieldMetadata("mydb", "meals", "cal", "Cal", "v2");
+      const fields = registry.getFieldsMetadata("mydb");
+      expect(fields).toHaveLength(1);
+      expect(fields[0].display_name).toBe("Cal");
+      expect(fields[0].description).toBe("v2");
+    });
+
+    it("updateFieldMetadata allows partial updates", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("mydb");
+      registry.updateFieldMetadata("mydb", "meals", "cal", "Calories");
+      const fields = registry.getFieldsMetadata("mydb");
+      expect(fields[0].display_name).toBe("Calories");
+      expect(fields[0].description).toBeNull();
+    });
+
+    it("updateFieldMetadata throws for unknown database", () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      expect(() => registry.updateFieldMetadata("missing", "t", "c", "D")).toThrow(/does not exist/);
+    });
+
+    it("getFieldsMetadata returns empty array when no fields set", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("mydb");
+      expect(registry.getFieldsMetadata("mydb")).toEqual([]);
+    });
+
+    it("getFieldsMetadata throws for unknown database", () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      expect(() => registry.getFieldsMetadata("missing")).toThrow(/does not exist/);
+    });
+
+    it("getFieldsMetadata returns fields across multiple tables", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("mydb");
+      registry.updateFieldMetadata("mydb", "meals", "cal", "Calories", "kcal");
+      registry.updateFieldMetadata("mydb", "exercise", "type", "Type", "lifting/cardio");
+      const fields = registry.getFieldsMetadata("mydb");
+      expect(fields).toHaveLength(2);
+    });
+
+    it("field metadata persists across instances", async () => {
+      const r1 = new DatabaseRegistry(TEST_DIR);
+      await r1.create("mydb");
+      r1.updateFieldMetadata("mydb", "meals", "cal", "Calories", "Integer kcal");
+      r1.close();
+
+      const r2 = new DatabaseRegistry(TEST_DIR);
+      const fields = r2.getFieldsMetadata("mydb");
+      expect(fields).toHaveLength(1);
+      expect(fields[0].display_name).toBe("Calories");
+      expect(fields[0].description).toBe("Integer kcal");
+    });
+  });
+
   describe("migration from _registry.json", () => {
     it("migrates entries from JSON to SQLite", () => {
       mkdirSync(TEST_DIR, { recursive: true });
