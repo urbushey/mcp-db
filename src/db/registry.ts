@@ -91,7 +91,32 @@ export class DatabaseRegistry {
     return this.adapters.get(name)!;
   }
 
-  async create(name: string): Promise<IDbAdapter> {
+  getMetadata(name: string): { description: string | null; notes: string | null } {
+    if (!this.exists(name)) {
+      throw new Error(`Database "${name}" does not exist`);
+    }
+    const row = this.metaDb.query("SELECT description, notes FROM databases WHERE name = ?").get(name) as {
+      description: string | null;
+      notes: string | null;
+    };
+    return { description: row.description, notes: row.notes };
+  }
+
+  updateDescription(name: string, description: string): void {
+    if (!this.exists(name)) {
+      throw new Error(`Database "${name}" does not exist`);
+    }
+    this.metaDb.run("UPDATE databases SET description = ? WHERE name = ?", [description, name]);
+  }
+
+  updateNotes(name: string, notes: string): void {
+    if (!this.exists(name)) {
+      throw new Error(`Database "${name}" does not exist`);
+    }
+    this.metaDb.run("UPDATE databases SET notes = ? WHERE name = ?", [notes, name]);
+  }
+
+  async create(name: string, description?: string): Promise<IDbAdapter> {
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       throw new Error("Database name must be a non-empty string");
     }
@@ -107,8 +132,8 @@ export class DatabaseRegistry {
     this.adapters.set(name, adapter);
 
     this.metaDb.run(
-      "INSERT INTO databases (name, path, created_at) VALUES (?, ?, ?)",
-      [name, filePath, new Date().toISOString()]
+      "INSERT INTO databases (name, path, description, created_at) VALUES (?, ?, ?, ?)",
+      [name, filePath, description ?? null, new Date().toISOString()]
     );
 
     return adapter;

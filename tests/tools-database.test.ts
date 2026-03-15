@@ -79,5 +79,65 @@ describe("database tools", () => {
       expect(data.tables).toHaveLength(1);
       expect(data.tables[0].name).toBe("items");
     });
+
+    it("returns description and notes alongside schema", async () => {
+      await registry.create("mydb", "A test database");
+      registry.updateNotes("mydb", "Use integers for IDs");
+
+      const result = await server.call("describe_database", { database: "mydb" }) as { content: { text: string }[] };
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.description).toBe("A test database");
+      expect(data.notes).toBe("Use integers for IDs");
+    });
+
+    it("returns null description and notes when not set", async () => {
+      await registry.create("mydb");
+
+      const result = await server.call("describe_database", { database: "mydb" }) as { content: { text: string }[] };
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.description).toBeNull();
+      expect(data.notes).toBeNull();
+    });
+  });
+
+  describe("update_database_notes", () => {
+    it("sets notes on an existing database", async () => {
+      await registry.create("mydb");
+
+      const result = await server.call("update_database_notes", {
+        database: "mydb",
+        notes: "- dates are YYYY-MM-DD\n- calories are integers",
+      }) as { content: { text: string }[] };
+
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.success).toBe(true);
+
+      const meta = registry.getMetadata("mydb");
+      expect(meta.notes).toBe("- dates are YYYY-MM-DD\n- calories are integers");
+    });
+
+    it("replaces existing notes", async () => {
+      await registry.create("mydb");
+      registry.updateNotes("mydb", "old notes");
+
+      await server.call("update_database_notes", {
+        database: "mydb",
+        notes: "new notes",
+      });
+
+      const meta = registry.getMetadata("mydb");
+      expect(meta.notes).toBe("new notes");
+    });
+
+    it("returns error for unknown database", async () => {
+      const result = await server.call("update_database_notes", {
+        database: "missing",
+        notes: "some notes",
+      }) as { isError: boolean; content: { text: string }[] };
+
+      expect(result.isError).toBe(true);
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.error).toMatch(/does not exist/);
+    });
   });
 });

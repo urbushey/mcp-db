@@ -23,7 +23,7 @@ export function registerDatabaseTools(server: ToolServer, registry: DatabaseRegi
 
   server.tool(
     "describe_database",
-    "Return the schema of a named database — table names, columns, and types. Call this at the start of any session involving an existing database.",
+    "Return the full context for a named database — schema (tables, columns, types), description, and agent notes. Call this at the start of any session involving an existing database.",
     {
       database: z.string().describe("The name of the database to describe"),
     },
@@ -38,8 +38,33 @@ export function registerDatabaseTools(server: ToolServer, registry: DatabaseRegi
         }
         const adapter = registry.get(database);
         const tables = await adapter.getTables();
+        const { description, notes } = registry.getMetadata(database);
         return {
-          content: [{ type: "text", text: JSON.stringify({ tables }) }],
+          content: [{ type: "text", text: JSON.stringify({ description, notes, tables }) }],
+        };
+      });
+    }
+  );
+
+  server.tool(
+    "update_database_notes",
+    "Write or replace freeform notes on a database. Use this to record conventions, valid enum values, data formatting rules, and anything a future session needs to know to use this database correctly. Notes are returned by describe_database.",
+    {
+      database: z.string().describe("The name of the database"),
+      notes: z.string().describe("The notes content (replaces any existing notes)"),
+    },
+    async (args: unknown) => {
+      const { database, notes } = args as { database: string; notes: string };
+      return logger.wrap("update_database_notes", args, async () => {
+        if (!registry.exists(database)) {
+          return {
+            content: [{ type: "text", text: JSON.stringify({ error: `Database "${database}" does not exist` }) }],
+            isError: true,
+          };
+        }
+        registry.updateNotes(database, notes);
+        return {
+          content: [{ type: "text", text: JSON.stringify({ success: true, database }) }],
         };
       });
     }

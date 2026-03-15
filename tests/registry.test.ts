@@ -89,6 +89,76 @@ describe("DatabaseRegistry", () => {
     expect(existsSync(join(TEST_DIR, "_metadata.sqlite"))).toBe(true);
   });
 
+  describe("metadata", () => {
+    it("creates database with description", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("meals", "Daily meal tracking");
+      const meta = registry.getMetadata("meals");
+      expect(meta.description).toBe("Daily meal tracking");
+      expect(meta.notes).toBeNull();
+    });
+
+    it("creates database without description defaults to null", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("meals");
+      const meta = registry.getMetadata("meals");
+      expect(meta.description).toBeNull();
+      expect(meta.notes).toBeNull();
+    });
+
+    it("getMetadata throws for unknown database", () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      expect(() => registry.getMetadata("missing")).toThrow(/does not exist/);
+    });
+
+    it("updateDescription sets description", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("meals");
+      registry.updateDescription("meals", "Calorie diary");
+      const meta = registry.getMetadata("meals");
+      expect(meta.description).toBe("Calorie diary");
+    });
+
+    it("updateDescription throws for unknown database", () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      expect(() => registry.updateDescription("missing", "foo")).toThrow(/does not exist/);
+    });
+
+    it("updateNotes sets notes", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("meals");
+      registry.updateNotes("meals", "- meal_type: breakfast, lunch, dinner, snack");
+      const meta = registry.getMetadata("meals");
+      expect(meta.notes).toBe("- meal_type: breakfast, lunch, dinner, snack");
+    });
+
+    it("updateNotes replaces existing notes", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("meals");
+      registry.updateNotes("meals", "first version");
+      registry.updateNotes("meals", "second version");
+      const meta = registry.getMetadata("meals");
+      expect(meta.notes).toBe("second version");
+    });
+
+    it("updateNotes throws for unknown database", () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      expect(() => registry.updateNotes("missing", "foo")).toThrow(/does not exist/);
+    });
+
+    it("metadata persists across instances", async () => {
+      const r1 = new DatabaseRegistry(TEST_DIR);
+      await r1.create("meals", "Calorie diary");
+      r1.updateNotes("meals", "Use integers for calories");
+      r1.close();
+
+      const r2 = new DatabaseRegistry(TEST_DIR);
+      const meta = r2.getMetadata("meals");
+      expect(meta.description).toBe("Calorie diary");
+      expect(meta.notes).toBe("Use integers for calories");
+    });
+  });
+
   describe("migration from _registry.json", () => {
     it("migrates entries from JSON to SQLite", () => {
       mkdirSync(TEST_DIR, { recursive: true });
