@@ -127,5 +127,109 @@ describe("schema tools", () => {
       const data = JSON.parse(result.content[0]!.text);
       expect(data.error).toMatch(/already exists/);
     });
+
+    it("stores field metadata from column definitions", async () => {
+      await server.call("create_database", {
+        database: "meals",
+        tables: [{
+          name: "diary",
+          columns: [
+            { name: "meal_type", type: "text", required: true, displayName: "Meal", description: "breakfast/lunch/dinner/snack" },
+            { name: "calories", type: "integer", displayName: "Calories" },
+            { name: "notes", type: "text" },
+          ],
+        }],
+      });
+
+      const fields = registry.getFieldsMetadata("meals");
+      expect(fields).toHaveLength(2); // only columns with metadata
+      const mealType = fields.find(f => f.column_name === "meal_type");
+      const cal = fields.find(f => f.column_name === "calories");
+      expect(mealType!.display_name).toBe("Meal");
+      expect(mealType!.description).toBe("breakfast/lunch/dinner/snack");
+      expect(cal!.display_name).toBe("Calories");
+      expect(cal!.description).toBeNull();
+    });
+
+    it("creates database without field metadata when none provided", async () => {
+      await server.call("create_database", {
+        database: "meals",
+        tables: [{
+          name: "diary",
+          columns: [{ name: "cal", type: "integer" }],
+        }],
+      });
+
+      const fields = registry.getFieldsMetadata("meals");
+      expect(fields).toEqual([]);
+    });
+  });
+
+  describe("create_table", () => {
+    it("adds a table to an existing database", async () => {
+      await registry.create("mydb");
+
+      const result = await server.call("create_table", {
+        database: "mydb",
+        table: {
+          name: "recipes",
+          columns: [
+            { name: "name", type: "text", required: true },
+            { name: "servings", type: "integer" },
+          ],
+        },
+      }) as { content: { text: string }[] };
+
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.success).toBe(true);
+      expect(data.table).toBe("recipes");
+
+      const adapter = registry.get("mydb");
+      const tables = await adapter.getTables();
+      expect(tables.map(t => t.name)).toContain("recipes");
+    });
+
+    it("returns error for unknown database", async () => {
+      const result = await server.call("create_table", {
+        database: "missing",
+        table: { name: "t", columns: [{ name: "x", type: "text" }] },
+      }) as { isError: boolean; content: { text: string }[] };
+
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0]!.text).error).toMatch(/does not exist/);
+    });
+
+    it("returns error if table already exists", async () => {
+      const adapter = await registry.create("mydb");
+      await adapter.createTable({ name: "items", columns: [{ name: "x", type: "text" }] });
+
+      const result = await server.call("create_table", {
+        database: "mydb",
+        table: { name: "items", columns: [{ name: "y", type: "text" }] },
+      }) as { isError: boolean; content: { text: string }[] };
+
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0]!.text).error).toMatch(/already exists/);
+    });
+
+    it("stores field metadata from column definitions", async () => {
+      await registry.create("mydb");
+
+      await server.call("create_table", {
+        database: "mydb",
+        table: {
+          name: "meals",
+          columns: [
+            { name: "cal", type: "integer", displayName: "Calories", description: "kcal" },
+            { name: "notes", type: "text" },
+          ],
+        },
+      });
+
+      const fields = registry.getFieldsMetadata("mydb");
+      expect(fields).toHaveLength(1);
+      expect(fields[0].display_name).toBe("Calories");
+      expect(fields[0].description).toBe("kcal");
+    });
   });
 });
