@@ -64,4 +64,43 @@ export function registerSchemaTools(server: ToolServer, registry: DatabaseRegist
       });
     }
   );
+
+  server.tool(
+    "create_table",
+    "Add a new table to an existing database. Use this to evolve a database schema without recreating it. Fails if the table already exists.",
+    {
+      database: z.string().describe("The name of the existing database"),
+      table: TableSchemaInput.describe("The table schema to create"),
+    },
+    async (args: unknown) => {
+      const { database, table } = args as {
+        database: string;
+        table: TableSchema & { columns: (TableSchema["columns"][number] & { displayName?: string; description?: string })[] };
+      };
+      return logger.wrap("create_table", args, async () => {
+        if (!registry.exists(database)) {
+          return {
+            content: [{ type: "text", text: JSON.stringify({ error: `Database "${database}" does not exist` }) }],
+            isError: true,
+          };
+        }
+        const adapter = registry.get(database);
+        if (await adapter.tableExists(table.name)) {
+          return {
+            content: [{ type: "text", text: JSON.stringify({ error: `Table "${table.name}" already exists in database "${database}"` }) }],
+            isError: true,
+          };
+        }
+        await adapter.createTable(table);
+        for (const col of table.columns) {
+          if (col.displayName || col.description) {
+            registry.updateFieldMetadata(database, table.name, col.name, col.displayName, col.description);
+          }
+        }
+        return {
+          content: [{ type: "text", text: JSON.stringify({ success: true, database, table: table.name }) }],
+        };
+      });
+    }
+  );
 }
