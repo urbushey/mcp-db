@@ -87,6 +87,36 @@ export function registerDatabaseTools(server: ToolServer, registry: DatabaseRegi
   );
 
   server.tool(
+    "delete_database",
+    "Permanently delete a database, its SQLite file, and all associated metadata. Requires confirm=true to proceed. This action cannot be undone.",
+    {
+      database: z.string().describe("The name of the database to delete"),
+      confirm: z.boolean().optional().describe("Must be true to confirm deletion"),
+    },
+    async (args: unknown) => {
+      const { database, confirm } = args as { database: string; confirm?: boolean };
+      return logger.wrap("delete_database", args, async () => {
+        if (!confirm) {
+          return {
+            content: [{ type: "text", text: JSON.stringify({ error: "You must pass confirm: true to delete a database. This action is irreversible." }) }],
+            isError: true,
+          };
+        }
+        if (!registry.exists(database)) {
+          return {
+            content: [{ type: "text", text: JSON.stringify({ error: `Database "${database}" does not exist` }) }],
+            isError: true,
+          };
+        }
+        registry.delete(database);
+        return {
+          content: [{ type: "text", text: JSON.stringify({ success: true, deleted: database }) }],
+        };
+      });
+    }
+  );
+
+  server.tool(
     "update_field_metadata",
     "Set a display name and/or description on a column. Use this to document what a field means, its valid values, units, or formatting rules. Field metadata is returned by describe_database.",
     {

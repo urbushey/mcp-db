@@ -233,6 +233,63 @@ describe("DatabaseRegistry", () => {
     });
   });
 
+  describe("delete", () => {
+    it("removes database from list", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("mydb");
+      expect(registry.exists("mydb")).toBe(true);
+      registry.delete("mydb");
+      expect(registry.exists("mydb")).toBe(false);
+      expect(registry.list()).not.toContain("mydb");
+    });
+
+    it("deletes the sqlite file from disk", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("mydb");
+      const dbPath = join(TEST_DIR, "mydb.sqlite");
+      expect(existsSync(dbPath)).toBe(true);
+      registry.delete("mydb");
+      expect(existsSync(dbPath)).toBe(false);
+    });
+
+    it("removes associated field metadata", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("mydb");
+      registry.updateFieldMetadata("mydb", "meals", "cal", "Calories", "kcal");
+      expect(registry.getFieldsMetadata("mydb")).toHaveLength(1);
+      registry.delete("mydb");
+      // After deletion, getFieldsMetadata should throw since db doesn't exist
+      expect(() => registry.getFieldsMetadata("mydb")).toThrow(/does not exist/);
+    });
+
+    it("throws for non-existent database", () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      expect(() => registry.delete("missing")).toThrow(/does not exist/);
+    });
+
+    it("allows re-creating a deleted database", async () => {
+      const registry = new DatabaseRegistry(TEST_DIR);
+      await registry.create("mydb");
+      registry.delete("mydb");
+      const adapter = await registry.create("mydb");
+      expect(registry.exists("mydb")).toBe(true);
+      await adapter.createTable({ name: "t", columns: [{ name: "x", type: "text" }] });
+      const tables = await adapter.getTables();
+      expect(tables.map((t) => t.name)).toContain("t");
+    });
+
+    it("persists deletion across instances", async () => {
+      const r1 = new DatabaseRegistry(TEST_DIR);
+      await r1.create("mydb");
+      r1.delete("mydb");
+      r1.close();
+
+      const r2 = new DatabaseRegistry(TEST_DIR);
+      expect(r2.exists("mydb")).toBe(false);
+      expect(r2.list()).not.toContain("mydb");
+    });
+  });
+
   describe("migration from _registry.json", () => {
     it("migrates entries from JSON to SQLite", () => {
       mkdirSync(TEST_DIR, { recursive: true });
