@@ -1,5 +1,5 @@
 import { Database } from "bun:sqlite";
-import { existsSync, mkdirSync, readFileSync, renameSync } from "fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync } from "fs";
 import { join } from "path";
 import type { IDbAdapter } from "./adapter.ts";
 import { SqliteAdapter } from "./sqlite.ts";
@@ -159,6 +159,30 @@ export class DatabaseRegistry {
     );
 
     return adapter;
+  }
+
+  delete(name: string): void {
+    if (!this.exists(name)) {
+      throw new Error(`Database "${name}" does not exist`);
+    }
+
+    const row = this.metaDb.query("SELECT path FROM databases WHERE name = ?").get(name) as { path: string };
+
+    // Close the adapter if it's open
+    const adapter = this.adapters.get(name);
+    if (adapter) {
+      adapter.close();
+      this.adapters.delete(name);
+    }
+
+    // Remove metadata (fields cascade via manual delete since SQLite FK doesn't auto-cascade on DELETE by default in all modes)
+    this.metaDb.run("DELETE FROM fields WHERE database_name = ?", [name]);
+    this.metaDb.run("DELETE FROM databases WHERE name = ?", [name]);
+
+    // Delete the SQLite file from disk
+    if (existsSync(row.path)) {
+      rmSync(row.path);
+    }
   }
 
   close(): void {

@@ -141,6 +141,70 @@ describe("database tools", () => {
     });
   });
 
+  describe("delete_database", () => {
+    it("deletes an existing database", async () => {
+      await registry.create("mydb");
+
+      const result = await server.call("delete_database", {
+        database: "mydb",
+        confirm: true,
+      }) as { content: { text: string }[] };
+
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.success).toBe(true);
+      expect(registry.exists("mydb")).toBe(false);
+    });
+
+    it("returns error without confirm flag", async () => {
+      await registry.create("mydb");
+
+      const result = await server.call("delete_database", {
+        database: "mydb",
+      }) as { isError: boolean; content: { text: string }[] };
+
+      expect(result.isError).toBe(true);
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.error).toMatch(/confirm/i);
+      // Database should still exist
+      expect(registry.exists("mydb")).toBe(true);
+    });
+
+    it("returns error with confirm=false", async () => {
+      await registry.create("mydb");
+
+      const result = await server.call("delete_database", {
+        database: "mydb",
+        confirm: false,
+      }) as { isError: boolean; content: { text: string }[] };
+
+      expect(result.isError).toBe(true);
+      expect(registry.exists("mydb")).toBe(true);
+    });
+
+    it("returns error for non-existent database", async () => {
+      const result = await server.call("delete_database", {
+        database: "missing",
+        confirm: true,
+      }) as { isError: boolean; content: { text: string }[] };
+
+      expect(result.isError).toBe(true);
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.error).toMatch(/does not exist/);
+    });
+
+    it("database no longer appears in list_databases after deletion", async () => {
+      await registry.create("db1");
+      await registry.create("db2");
+
+      await server.call("delete_database", { database: "db1", confirm: true });
+
+      const result = await server.call("list_databases", {}) as { content: { text: string }[] };
+      const data = JSON.parse(result.content[0]!.text);
+      expect(data.databases).not.toContain("db1");
+      expect(data.databases).toContain("db2");
+    });
+  });
+
   describe("describe_database with field metadata", () => {
     it("includes field metadata on columns", async () => {
       const adapter = await registry.create("mydb");
