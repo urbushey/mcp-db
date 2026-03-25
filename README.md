@@ -156,7 +156,7 @@ Fly deployment scaffolding exists in:
 - `fly.toml.example`
 - `docs/fly-deployment.md`
 
-Important: the current server is still **stdio-only**, so remote Fly verification is blocked until HTTP transport work lands.
+The repo now includes streamable HTTP transport plus protected-resource metadata / bearer-token auth hooks for remote MCP. The remaining hosted-MVP work is deploying with real OAuth issuer settings, validating against a real WorkOS setup, and confirming the end-to-end Claude-compatible flow.
 
 ### Repository Structure
 
