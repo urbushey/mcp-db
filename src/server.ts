@@ -1,5 +1,4 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { Config } from "./config.ts";
 import { DatabaseRegistry } from "./db/registry.ts";
 import { Logger } from "./logger.ts";
@@ -27,8 +26,3 @@ export async function createServer(config: Config) {
   return { server, registry, logger };
 }
 
-export async function startServer(config: Config) {
-  const { server } = await createServer(config);
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
-}

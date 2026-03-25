@@ -1,5 +1,9 @@
 import { loadConfig } from "./config.ts";
-import { startServer } from "./server.ts";
+import { startConfiguredTransport } from "./transport.ts";
 
 const config = loadConfig();
-await startServer(config);
+const running = await startConfiguredTransport(config);
+
+if (running.kind === "http") {
+  console.log(`MCP streamable HTTP server listening on ${running.url}`);
+}
