@@ -101,7 +101,7 @@ The existing tool handlers are transport-agnostic — they work identically over
 
 ### Authentication
 
-**OAuth 2.1 via third-party provider (Auth0, Clerk, or similar)**
+**OAuth 2.1 via third-party provider (recommended for MVP: WorkOS AuthKit / Connect; Auth0 as fallback)**
 
 - Required for Claude mobile — it uses OAuth to authenticate with remote MCP servers
 - Dynamic Client Registration endpoint (Claude can't pre-configure credentials)
@@ -260,7 +260,7 @@ Essential for v1. Users need a way to manage their account and see their data.
 ## Open Questions
 
 1. **Domain / branding**: `instantdb.dev`? `instant-db.io`? Need to check availability. (Note: "InstantDB" is an existing product — may need to differentiate.)
-2. **OAuth provider choice**: Auth0 vs Clerk vs other. Need to evaluate Dynamic Client Registration support specifically.
+2. **OAuth provider choice**: Resolved for MVP in issue #11 / ADR 0001 — use WorkOS AuthKit / Connect. Auth0 remains the fallback if pricing or token-shape constraints block WorkOS. Clerk is not a good fit for the remote MCP authorization-server role.
 3. **Hosting provider**: Fly.io, Railway, AWS, GCP? Decision should be driven by cost, latency, and ease of deploying Bun-based services.
 4. **Open source boundary**: The local MCP server stays open source. The hosting layer (multi-tenancy, auth, billing, dashboard) — open source or proprietary? Deferred.
 5. **SQLite concurrency**: A single Bun process with WAL mode handles concurrent reads well, but multiple users writing simultaneously needs load testing. May need connection pooling or write queuing.
