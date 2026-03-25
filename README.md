@@ -147,6 +147,17 @@ bun test
 bun run src/index.ts
 ```
 
+## Fly.io status
+
+Fly deployment scaffolding exists in:
+
+- `Dockerfile`
+- `.dockerignore`
+- `fly.toml.example`
+- `docs/fly-deployment.md`
+
+Important: the current server is still **stdio-only**, so remote Fly verification is blocked until HTTP transport work lands.
+
 ### Repository Structure
 
 ```
