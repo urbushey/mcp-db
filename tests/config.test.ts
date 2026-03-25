@@ -78,4 +78,12 @@ describe("loadConfig", () => {
     expect(config.PUBLIC_BASE_URL).toBe("https://mcp.example.com");
   });
 
+  it("parses false-like AUTH_REQUIRED values correctly", async () => {
+    process.env["AUTH_REQUIRED"] = "false";
+
+    const { loadConfig } = await import("../src/config.ts");
+    const config = loadConfig();
+    expect(config.AUTH_REQUIRED).toBe(false);
+  });
+
 });

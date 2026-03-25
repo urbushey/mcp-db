@@ -1,6 +1,15 @@
 import { z } from "zod";
 
 const OptionalUrl = z.string().url().optional();
+const EnvBoolean = z.preprocess((value) => {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off", ""].includes(normalized)) return false;
+  }
+  return value;
+}, z.boolean());
 
 const ConfigSchema = z.object({
   DATA_DIR: z.string().default("./data"),
@@ -10,7 +19,7 @@ const ConfigSchema = z.object({
   MCP_HTTP_HOST: z.string().default("127.0.0.1"),
   MCP_HTTP_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   MCP_HTTP_PATH: z.string().default("/mcp").transform((value) => value.startsWith("/") ? value : `/${value}`),
-  AUTH_REQUIRED: z.coerce.boolean().default(false),
+  AUTH_REQUIRED: EnvBoolean.default(false),
   OAUTH_ISSUER: OptionalUrl,
   OAUTH_AUDIENCE: z.string().optional(),
   OAUTH_JWKS_URL: OptionalUrl,
