@@ -1,10 +1,10 @@
 # Fly.io deployment notes
 
-This repo is **not remotely deployable yet** in the MVP sense, because the server currently only supports MCP over stdio.
+This repo now has streamable HTTP transport, protected-resource metadata, and bearer-token validation hooks for remote MCP.
 
 - Current entrypoint: `src/index.ts`
-- Current transport: `StdioServerTransport`
-- Blocking ticket for remote endpoint: **#10**
+- HTTP transport path: `/mcp`
+- Auth config: `AUTH_REQUIRED`, `OAUTH_ISSUER`, `OAUTH_AUDIENCE`, `PUBLIC_BASE_URL`
 - Deployment/verification ticket: **#12**
 
 ## What is already safe to prepare

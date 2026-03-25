@@ -8,9 +8,17 @@ import { registerRecordTools } from "./tools/records.ts";
 import { registerQueryTools } from "./tools/query.ts";
 import { registerMutationTools } from "./tools/mutation.ts";
 
-export async function createServer(config: Config) {
-  const registry = new DatabaseRegistry(config.DATA_DIR);
-  const logger = new Logger({ LOG_LEVEL: config.LOG_LEVEL, LOG_PATH: config.LOG_PATH });
+export type ServerOptions = {
+  dataDir?: string;
+  logPath?: string;
+};
+
+export async function createServer(config: Config, options: ServerOptions = {}) {
+  const registry = new DatabaseRegistry(options.dataDir ?? config.DATA_DIR);
+  const logger = new Logger({
+    LOG_LEVEL: config.LOG_LEVEL,
+    LOG_PATH: options.logPath ?? config.LOG_PATH,
+  });
 
   const server = new McpServer({
     name: "instant-db",
@@ -25,4 +33,3 @@ export async function createServer(config: Config) {
 
   return { server, registry, logger };
 }
-
