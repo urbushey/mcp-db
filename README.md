@@ -158,6 +158,14 @@ Fly deployment scaffolding exists in:
 
 The repo now includes streamable HTTP transport plus protected-resource metadata / bearer-token auth hooks for remote MCP. The remaining hosted-MVP work is deploying with real OAuth issuer settings, validating against a real WorkOS setup, and confirming the end-to-end Claude-compatible flow.
 
+## Architecture
+
+If you want the short explanation of how local mode, hosted mode, auth, and storage fit together, read:
+
+- `docs/architecture.md`
+
+It includes a plain-English walkthrough and an ASCII diagram of the full stack.
+
 ### Repository Structure
 
 ```
