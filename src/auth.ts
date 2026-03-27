@@ -50,11 +50,16 @@ export class JwtAccessTokenVerifier {
     const token = extractBearerToken(authorizationHeader);
 
     try {
-      const { payload } = await jwtVerify(token, this.jwks, {
+      const verifyOptions: Parameters<typeof jwtVerify>[2] = {
         issuer: this.config.OAUTH_ISSUER,
-        audience: this.config.OAUTH_AUDIENCE,
         algorithms: ["RS256", "ES256", "PS256"],
-      });
+      };
+      // Only enforce audience if explicitly configured; some providers (e.g. WorkOS/AuthKit)
+      // set aud to the DCR client_id rather than the resource URL.
+      if (this.config.OAUTH_AUDIENCE) {
+        verifyOptions.audience = this.config.OAUTH_AUDIENCE;
+      }
+      const { payload } = await jwtVerify(token, this.jwks, verifyOptions);
 
       if (typeof payload.sub !== "string" || payload.sub.length === 0) {
         throw new UnauthorizedError("Token is missing subject");

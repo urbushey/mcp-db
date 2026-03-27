@@ -33,14 +33,6 @@ const ConfigSchema = z.object({
     });
   }
 
-  if (config.AUTH_REQUIRED && !config.OAUTH_AUDIENCE) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["OAUTH_AUDIENCE"],
-      message: "OAUTH_AUDIENCE is required when AUTH_REQUIRED=true",
-    });
-  }
-
   if (config.MCP_TRANSPORT === "http" && config.AUTH_REQUIRED && !config.PUBLIC_BASE_URL) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
