@@ -70,7 +70,7 @@ export async function startConfiguredTransport(config: Config): Promise<RunningT
   }
 
   const httpServer = createServer(async (req, res) => {
-    console.log(`[req] ${req.method} ${req.url} auth=${req.headers.authorization ? req.headers.authorization.substring(0, 20) + '...' : 'none'}`);
+
     try {
       if (!req.url) {
         jsonError(res, 400, "Missing request URL");
@@ -108,7 +108,6 @@ export async function startConfiguredTransport(config: Config): Promise<RunningT
         }
       } catch (error) {
         if (error instanceof UnauthorizedError) {
-          console.log(`[auth-fail] ${error.message}`);
           writeUnauthorized(res, config, req, error.message);
           return;
         }
