@@ -14,5 +14,8 @@ ENV MCP_TRANSPORT=http
 ENV MCP_HTTP_HOST=0.0.0.0
 ENV MCP_HTTP_PORT=3000
 ENV MCP_HTTP_PATH=/mcp
+ENV WEB_DIST_DIR=/app/web/dist
+
+RUN bun run build:web
 
 CMD ["bun", "run", "src/index.ts"]
