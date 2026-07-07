@@ -7,14 +7,15 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "test": "bun test",
-    "build:web": "bun build web/index.html --outdir web/dist --minify",
-    "dev:web": "bun build web/index.html --outdir web/dist --watch",
+    "build:web": "bun run scripts/build-web.ts",
+    "dev:web": "bun run scripts/build-web.ts --watch",
     "dev": "bun run dev:web & bun --hot run src/index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
     "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3"
+    "@types/react-dom": "^19.2.3",
+    "bun-plugin-tailwind": "^0.1.2"
   },
   "peerDependencies": {
     "typescript": "^5"

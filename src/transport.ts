@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { JwtAccessTokenVerifier, UnauthorizedError, getUserDataDir } from "./auth.ts";
+import { recordMcpSeen } from "./connection-status.ts";
 import type { Config } from "./config.ts";
 import { createServer as createMcpServer } from "./server.ts";
 import { handleWebRequest } from "./web-server.ts";
@@ -182,6 +183,8 @@ export async function startConfiguredTransport(config: Config): Promise<RunningT
           }
           throw error;
         }
+
+        if (req.method === "POST") recordMcpSeen(dataDir);
 
         const { server, registry } = await createMcpServer(config, { dataDir });
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });

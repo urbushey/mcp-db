@@ -8,6 +8,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { Database } from "bun:sqlite";
 import { DatabaseRegistry } from "./db/registry.ts";
 import { getUserDataDir } from "./auth.ts";
+import { readMcpLastSeen } from "./connection-status.ts";
 import type { Config } from "./config.ts";
 import {
   getSessionFromRequest,
@@ -181,6 +182,26 @@ function handleApiMe(req: IncomingMessage, res: ServerResponse, config: Config):
   jsonResponse(res, 200, { sub: session.sub, email: session.email, name: session.name });
 }
 
+function handleApiStatus(req: IncomingMessage, res: ServerResponse, config: Config): void {
+  const session = requireSession(req, res, config);
+  if (!session) return;
+
+  const dataDir = getUserDataDir(config, session.sub);
+  const lastSeen = readMcpLastSeen(dataDir);
+
+  let dbCount = 0;
+  const registry = new DatabaseRegistry(dataDir);
+  try {
+    dbCount = registry.list().length;
+  } catch {
+    // A fresh user has no registry yet — connected:false, dbCount:0 is correct.
+  } finally {
+    registry.close();
+  }
+
+  jsonResponse(res, 200, { connected: lastSeen !== null, lastSeen, dbCount });
+}
+
 function handleApiDatabases(req: IncomingMessage, res: ServerResponse, config: Config): void {
   const session = requireSession(req, res, config);
   if (!session) return;
@@ -252,6 +273,14 @@ async function handleStatic(res: ServerResponse, urlPath: string, config: Config
     return serveFile(res, assetPath, 31_536_000);
   }
 
+  // Bun's HTML build emits hashed bundles at the dist root (/index-<hash>.js).
+  // Single path segment only — no traversal possible.
+  const rootAsset = urlPath.match(/^\/([A-Za-z0-9_-]+\.[A-Za-z0-9.]+)$/);
+  if (rootAsset) {
+    const hashed = /-[a-z0-9]{6,}\./.test(rootAsset[1]!);
+    return serveFile(res, join(distDir, rootAsset[1]!), hashed ? 31_536_000 : 0);
+  }
+
   // SPA routes — serve index.html (React handles client-side routing)
   if (urlPath === "/" || urlPath === "/dashboard") {
     const indexPath = join(distDir, "index.html");
@@ -307,6 +336,7 @@ export async function handleWebRequest(
   if (path === "/auth/logout"   && method === "GET") { handleAuthLogout(res); return true; }
 
   if (path === "/api/me"        && method === "GET") { handleApiMe(req, res, config); return true; }
+  if (path === "/api/status"    && method === "GET") { handleApiStatus(req, res, config); return true; }
   if (path === "/api/databases" && method === "GET") { handleApiDatabases(req, res, config); return true; }
 
   const tablesMatch = path.match(/^\/api\/databases\/([^/]+)\/tables$/);
