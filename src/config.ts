@@ -20,6 +20,8 @@ const ConfigSchema = z.object({
   MCP_HTTP_PORT: z.coerce.number().int().min(1).max(65535).default(3001),
   MCP_HTTP_PATH: z.string().default("/mcp").transform((value) => value.startsWith("/") ? value : `/${value}`),
   AUTH_REQUIRED: EnvBoolean.default(false),
+  // Quota enforcement (billing spec Phase 1 ships metering with this off)
+  USAGE_ENFORCE: EnvBoolean.default(false),
   OAUTH_ISSUER: OptionalUrl,
   OAUTH_AUDIENCE: z.string().optional(),
   OAUTH_JWKS_URL: OptionalUrl,

@@ -9,6 +9,7 @@ import { Database } from "bun:sqlite";
 import { DatabaseRegistry } from "./db/registry.ts";
 import { getUserDataDir } from "./auth.ts";
 import { readMcpLastSeen } from "./connection-status.ts";
+import { UsageStore } from "./usage.ts";
 import type { Config } from "./config.ts";
 import {
   getSessionFromRequest,
@@ -199,7 +200,15 @@ function handleApiStatus(req: IncomingMessage, res: ServerResponse, config: Conf
     registry.close();
   }
 
-  jsonResponse(res, 200, { connected: lastSeen !== null, lastSeen, dbCount });
+  let toolCallsToday = 0;
+  const usage = new UsageStore(config.DATA_DIR);
+  try {
+    toolCallsToday = usage.toolCallsOn(session.sub);
+  } finally {
+    usage.close();
+  }
+
+  jsonResponse(res, 200, { connected: lastSeen !== null, lastSeen, dbCount, toolCallsToday });
 }
 
 function handleApiDatabases(req: IncomingMessage, res: ServerResponse, config: Config): void {

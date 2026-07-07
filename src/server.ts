@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { Config } from "./config.ts";
 import { DatabaseRegistry } from "./db/registry.ts";
-import { Logger } from "./logger.ts";
+import { Logger, type UsageHook } from "./logger.ts";
 import { registerDatabaseTools } from "./tools/database.ts";
 import { registerSchemaTools } from "./tools/schema.ts";
 import { registerRecordTools } from "./tools/records.ts";
@@ -11,14 +11,18 @@ import { registerMutationTools } from "./tools/mutation.ts";
 export type ServerOptions = {
   dataDir?: string;
   logPath?: string;
+  usage?: UsageHook;
 };
 
 export async function createServer(config: Config, options: ServerOptions = {}) {
   const registry = new DatabaseRegistry(options.dataDir ?? config.DATA_DIR);
-  const logger = new Logger({
-    LOG_LEVEL: config.LOG_LEVEL,
-    LOG_PATH: options.logPath ?? config.LOG_PATH,
-  });
+  const logger = new Logger(
+    {
+      LOG_LEVEL: config.LOG_LEVEL,
+      LOG_PATH: options.logPath ?? config.LOG_PATH,
+    },
+    options.usage,
+  );
 
   const server = new McpServer({
     name: "instant-db",
