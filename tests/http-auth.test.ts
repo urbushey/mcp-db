@@ -94,6 +94,7 @@ describe("HTTP auth transport", () => {
       OAUTH_AUDIENCE: "https://mcp.example.test",
       OAUTH_JWKS_URL: `${issuer}/.well-known/jwks.json`,
       PUBLIC_BASE_URL: "https://mcp.example.test",
+      WEB_DIST_DIR: "./web/dist",
     });
 
     const address = running.server.address();
@@ -127,6 +128,7 @@ describe("HTTP auth transport", () => {
       OAUTH_AUDIENCE: "https://mcp.example.test",
       OAUTH_JWKS_URL: `${issuer}/.well-known/jwks.json`,
       PUBLIC_BASE_URL: "https://mcp.example.test",
+      WEB_DIST_DIR: "./web/dist",
     });
 
     const address = running.server.address();
@@ -135,7 +137,7 @@ describe("HTTP auth transport", () => {
     }
 
     const response = await fetch(`http://127.0.0.1:${address.port}/.well-known/oauth-protected-resource`);
-    const metadata = await response.json();
+    const metadata = await response.json() as { resource: string; authorization_servers: string[]; bearer_methods_supported: string[] };
 
     expect(response.status).toBe(200);
     expect(metadata.resource).toBe("https://mcp.example.test");
@@ -159,6 +161,7 @@ describe("HTTP auth transport", () => {
       OAUTH_AUDIENCE: "https://mcp.example.test",
       OAUTH_JWKS_URL: `${jwks.issuer}/.well-known/jwks.json`,
       PUBLIC_BASE_URL: "https://mcp.example.test",
+      WEB_DIST_DIR: "./web/dist",
     };
     const running = await startTestTransport(config);
 

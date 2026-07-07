@@ -24,6 +24,16 @@ const ConfigSchema = z.object({
   OAUTH_AUDIENCE: z.string().optional(),
   OAUTH_JWKS_URL: OptionalUrl,
   PUBLIC_BASE_URL: OptionalUrl,
+  // OAuth endpoints for DCR proxy and dashboard auth
+  OAUTH_AUTH_ENDPOINT: OptionalUrl,
+  OAUTH_TOKEN_ENDPOINT: OptionalUrl,
+  // DCR (Dynamic Client Registration) pre-configured credentials
+  DCR_CLIENT_ID: z.string().optional(),
+  DCR_CLIENT_SECRET: z.string().optional(),
+  // Dashboard session signing secret
+  SESSION_SECRET: z.string().optional(),
+  // Path to built web assets (set automatically in Docker)
+  WEB_DIST_DIR: z.string().default("./web/dist"),
 }).superRefine((config, ctx) => {
   if (config.AUTH_REQUIRED && !config.OAUTH_ISSUER) {
     ctx.addIssue({
