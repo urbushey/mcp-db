@@ -3,6 +3,7 @@ import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { JwtAccessTokenVerifier, UnauthorizedError, getUserDataDir } from "./auth.ts";
 import { recordMcpSeen } from "./connection-status.ts";
+import { UsageStore, makeUsageHook } from "./usage.ts";
 import type { Config } from "./config.ts";
 import { createServer as createMcpServer } from "./server.ts";
 import { handleWebRequest } from "./web-server.ts";
@@ -132,6 +133,10 @@ export async function startConfiguredTransport(config: Config): Promise<RunningT
     return { kind: "stdio" };
   }
 
+  // One store for the whole HTTP server; metering only applies to
+  // authenticated (hosted) traffic, never to local stdio use.
+  const usageStore = config.AUTH_REQUIRED ? new UsageStore(config.DATA_DIR) : null;
+
   const httpServer = createServer(async (req, res) => {
     try {
       if (!req.url) {
@@ -173,9 +178,13 @@ export async function startConfiguredTransport(config: Config): Promise<RunningT
         }
 
         let dataDir = config.DATA_DIR;
+        let userId: string | null = null;
         try {
           const user = await resolveUser(config, req);
-          if (user) dataDir = getUserDataDir(config, user.subject);
+          if (user) {
+            userId = user.subject;
+            dataDir = getUserDataDir(config, user.subject);
+          }
         } catch (error) {
           if (error instanceof UnauthorizedError) {
             writeUnauthorized(res, config, req, error.message);
@@ -186,7 +195,17 @@ export async function startConfiguredTransport(config: Config): Promise<RunningT
 
         if (req.method === "POST") recordMcpSeen(dataDir);
 
-        const { server, registry } = await createMcpServer(config, { dataDir });
+        const usage = usageStore && userId
+          ? makeUsageHook({
+              store: usageStore,
+              userId,
+              userDataDir: dataDir,
+              enforce: config.USAGE_ENFORCE,
+              baseUrl: config.PUBLIC_BASE_URL,
+            })
+          : undefined;
+
+        const { server, registry } = await createMcpServer(config, { dataDir, usage });
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
         await server.connect(transport);
 
@@ -239,6 +258,7 @@ export async function startConfiguredTransport(config: Config): Promise<RunningT
       await new Promise<void>((resolve, reject) => {
         httpServer.close((err) => (err ? reject(err) : resolve()));
       });
+      usageStore?.close();
     },
   };
 }
