@@ -158,6 +158,43 @@ Fly deployment scaffolding exists in:
 
 The repo now includes streamable HTTP transport plus protected-resource metadata / bearer-token auth hooks for remote MCP. The remaining hosted-MVP work is deploying with real OAuth issuer settings, validating against a real WorkOS setup, and confirming the end-to-end Claude-compatible flow.
 
+## Headless clients (personal access tokens)
+
+An agent that can't complete a browser login can authenticate to the hosted `/mcp` endpoint with a personal access token instead. A token acts as your user, so it sees the same databases as your OAuth session, and its tool calls count against your usage.
+
+**1. Find your user id.** Sign in to the dashboard and open `/api/me`. The `sub` field is your user id.
+
+**2. Mint a token** on the host that holds the data directory:
+
+```bash
+fly ssh console -C "bun run scripts/pat.ts create --sub <your-sub> --name labmind-pi --expires-days 90"
+```
+
+The token (`mcpdb_pat_…`) is printed once. Only its sha256 hash is stored, so copy it now. Leave off `--expires-days` for a token that doesn't expire.
+
+**3. Configure the client** to send it as a bearer token:
+
+```json
+{
+  "mcpServers": {
+    "instant-db": {
+      "type": "http",
+      "url": "https://<your-host>/mcp",
+      "headers": { "Authorization": "Bearer mcpdb_pat_…" }
+    }
+  }
+}
+```
+
+**List or revoke** tokens:
+
+```bash
+bun run scripts/pat.ts list   --sub <your-sub>
+bun run scripts/pat.ts revoke --sub <your-sub> --id <token-id>
+```
+
+A revoked or expired token gets a 401.
+
 ## Architecture
 
 If you want the short explanation of how local mode, hosted mode, auth, and storage fit together, read:

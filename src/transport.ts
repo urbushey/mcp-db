@@ -1,7 +1,8 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { JwtAccessTokenVerifier, UnauthorizedError, getUserDataDir } from "./auth.ts";
+import { JwtAccessTokenVerifier, UnauthorizedError, extractBearerToken, getUserDataDir, sanitizeSubjectForStorage, type AuthenticatedUser } from "./auth.ts";
+import { PatStore, isPersonalAccessToken } from "./pat.ts";
 import { recordMcpSeen } from "./connection-status.ts";
 import { UsageStore, makeUsageHook } from "./usage.ts";
 import type { Config } from "./config.ts";
@@ -119,8 +120,22 @@ function writeDcrResponse(res: ServerResponse, config: Config) {
   res.end(JSON.stringify(body));
 }
 
-async function resolveUser(config: Config, req: IncomingMessage) {
+async function resolveUser(config: Config, req: IncomingMessage, patStore: PatStore | null): Promise<AuthenticatedUser | null> {
   if (!config.AUTH_REQUIRED) return null;
+
+  // Personal access tokens carry a fixed prefix; everything else is an OAuth JWT.
+  const token = extractBearerToken(req.headers.authorization);
+  if (patStore && isPersonalAccessToken(token)) {
+    const pat = patStore.verify(token);
+    if (!pat) throw new UnauthorizedError("Invalid, revoked or expired personal access token");
+    return {
+      subject: pat.subject,
+      storageKey: sanitizeSubjectForStorage(pat.subject),
+      token,
+      claims: { sub: pat.subject },
+    };
+  }
+
   const verifier = new JwtAccessTokenVerifier(config);
   return verifier.verifyAuthorizationHeader(req.headers.authorization);
 }
@@ -136,6 +151,7 @@ export async function startConfiguredTransport(config: Config): Promise<RunningT
   // One store for the whole HTTP server; metering only applies to
   // authenticated (hosted) traffic, never to local stdio use.
   const usageStore = config.AUTH_REQUIRED ? new UsageStore(config.DATA_DIR) : null;
+  const patStore = config.AUTH_REQUIRED ? new PatStore(config.DATA_DIR) : null;
 
   const httpServer = createServer(async (req, res) => {
     try {
@@ -180,7 +196,7 @@ export async function startConfiguredTransport(config: Config): Promise<RunningT
         let dataDir = config.DATA_DIR;
         let userId: string | null = null;
         try {
-          const user = await resolveUser(config, req);
+          const user = await resolveUser(config, req, patStore);
           if (user) {
             userId = user.subject;
             dataDir = getUserDataDir(config, user.subject);
@@ -259,6 +275,7 @@ export async function startConfiguredTransport(config: Config): Promise<RunningT
         httpServer.close((err) => (err ? reject(err) : resolve()));
       });
       usageStore?.close();
+      patStore?.close();
     },
   };
 }

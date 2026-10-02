@@ -25,7 +25,7 @@ export function getUserDataDir(config: Config, subject: string): string {
   return join(config.DATA_DIR, "users", sanitizeSubjectForStorage(subject));
 }
 
-function extractBearerToken(authorizationHeader: string | undefined): string {
+export function extractBearerToken(authorizationHeader: string | undefined): string {
   if (!authorizationHeader) {
     throw new UnauthorizedError("Missing bearer token");
   }
