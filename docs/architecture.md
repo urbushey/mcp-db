@@ -1,258 +1,164 @@
 # Architecture Overview
 
-This project supports two deployment shapes with the same core MCP tool layer:
+instant-db runs in two shapes that share the same MCP tool layer:
 
-1. **Local / stdio mode** for Claude Desktop or Claude Code
-2. **Hosted / HTTP mode** for a remote MCP deployment on Fly.io with OAuth in front of it
+1. **Local / stdio** for Claude Desktop or Claude Code on your own machine. No auth, one data directory.
+2. **Hosted / HTTP** on Fly.io. Users sign in through WorkOS, and each user gets a private data directory.
 
-The important design choice is that the tool handlers and database layer stay the same in both modes. The transport and auth layers change; the database operations do not.
+The tool handlers and database layer are identical in both. Only the transport and auth layers change.
 
-## High-level idea
+## The pieces
 
-- `src/index.ts` loads config and starts the configured transport
-- `src/transport.ts` chooses between stdio and streamable HTTP
-- `src/server.ts` builds the MCP server and registers tools
-- `src/tools/*` implement the actual MCP behaviors
-- `src/db/*` persists metadata and SQLite databases
-- `src/auth.ts` verifies bearer tokens for hosted HTTP mode and derives per-user storage paths
+| Piece | What it does |
+|---|---|
+| **WorkOS / AuthKit** | Owns user accounts and login. Shows the sign-in page, checks credentials, issues signed tokens (JWTs), and publishes the public keys that verify them. instant-db never sees a password. |
+| **Fly.io app** | Runs the Bun server: `/mcp`, the dashboard, the OAuth discovery endpoints. One machine, one volume. |
+| **Fly secrets** | WorkOS settings and the session signing key. See [Settings](#settings). |
+| **Fly volume `/data`** | All user data, plus the control-plane database `_accounts.sqlite`. |
+| **Claude** (web, desktop, mobile, Code) | The MCP client. Runs the OAuth flow with WorkOS and then calls `/mcp` with the token it got. |
 
-## Architecture diagram
+The one fact that ties them together is the **WorkOS user id** (`sub`, e.g. `user_01…`). Every way of signing in ends with a `sub`, and `sub` decides whose data a request can touch:
 
 ```text
-                          LOCAL MODE
-
-   Claude Desktop / Claude Code
-               |
-               | stdio
-               v
-        +-------------------+
-        |   instant-db MCP   |
-        |  (Bun process)     |
-        +-------------------+
-               |
-               v
-        +-------------------+
-        |   Tool handlers    |
-        |  schema/query/etc  |
-        +-------------------+
-               |
-               v
-        +-------------------+
-        | DatabaseRegistry   |
-        | _metadata.sqlite   |
-        +-------------------+
-               |
-               v
-        +-------------------+
-        | SQLite files       |
-        | data/*.sqlite      |
-        +-------------------+
-
-
-                         HOSTED MODE
-
-   Claude web / mobile / remote client
-               |
-               | HTTPS + MCP Streamable HTTP
-               v
-        +-------------------------------+
-        | Fly.io app                    |
-        | mcp-db-mvp-labmind.fly.dev    |
-        +-------------------------------+
-               |
-               v
-        +-------------------------------+
-        | HTTP transport layer          |
-        | /mcp, /health, /.well-known/* |
-        +-------------------------------+
-               |
-               | bearer token
-               v
-        +-------------------------------+
-        | Auth layer                    |
-        | WorkOS/AuthKit-issued token   |
-        | verification + 401 challenge  |
-        +-------------------------------+
-               |
-               | subject -> hashed user path
-               v
-        +-------------------------------+
-        | MCP server + tool handlers    |
-        +-------------------------------+
-               |
-               v
-        +-------------------------------+
-        | Per-user storage              |
-        | data/users/<hash>/            |
-        | _metadata.sqlite + *.sqlite   |
-        +-------------------------------+
+data/users/<sha256(sub)>/
 ```
 
-## Component breakdown
+## Code map
 
-### 1) Config
+| File | Responsibility |
+|---|---|
+| `src/index.ts` | Loads config, starts the transport |
+| `src/config.ts` | Parses env vars. In hosted mode, refuses to start if any sign-in setting is missing. |
+| `src/transport.ts` | stdio or HTTP. In HTTP mode it routes `/mcp`, `/health`, `/.well-known/*`, `/register`, and hands everything else to the web server. Resolves the caller to a `sub`. |
+| `src/auth.ts` | Verifies WorkOS JWTs against the JWKS. Maps `sub` to a data directory. |
+| `src/pat.ts` | Personal access tokens: mint, verify, revoke. Stores hashes only. |
+| `src/web-server.ts`, `src/web-auth.ts` | Dashboard sign-in (`/auth/*`), session cookie, `/api/*`, static files |
+| `src/usage.ts` | Usage meter and plan limits, stored in `_accounts.sqlite` |
+| `src/logger.ts` | Wraps every tool call: quota check before, usage record after, JSONL log |
+| `src/server.ts` | Builds the MCP server, the registry, and the logger for one data directory |
+| `src/tools/*` | The MCP tools (`list_databases`, `create_database`, `insert_record`, `query_records`, …) |
+| `src/db/*` | `DatabaseRegistry` (`_metadata.sqlite`) and the SQLite adapter, one file per database |
+| `web/app.tsx` | Landing page, onboarding, dashboard |
 
-`src/config.ts`
+## Three ways a request gets a user
 
-Responsible for:
-- loading environment variables
-- deciding whether the app runs in `stdio` or `http` mode
-- validating auth-related settings for hosted mode
+### 1. Claude connector (OAuth)
 
-Key settings:
-- `MCP_TRANSPORT`
-- `MCP_HTTP_HOST`
-- `MCP_HTTP_PORT`
-- `MCP_HTTP_PATH`
-- `AUTH_REQUIRED`
-- `OAUTH_ISSUER`
-- `OAUTH_AUDIENCE`
-- `OAUTH_JWKS_URL`
-- `PUBLIC_BASE_URL`
+How claude.ai, Claude Desktop, mobile and Code connect. Claude does the OAuth work; instant-db mostly points it at WorkOS and checks the result.
 
-### 2) Transport layer
+```text
+ Claude                      instant-db (Fly)                  WorkOS / AuthKit
+   |                               |                                  |
+   |-- POST /mcp (no token) ------>|                                  |
+   |<-- 401 + resource_metadata ---|                                  |
+   |-- GET /.well-known/oauth-protected-resource -->|                 |
+   |<-- authorization_servers: [instant-db] --------|                 |
+   |-- GET /.well-known/oauth-authorization-server ->|                |
+   |<-- authorize/token = WorkOS, register = /register               |
+   |-- POST /register ------------>|                                  |
+   |<-- shared client_id + secret -|                                  |
+   |                               |                                  |
+   |-- send user to authorize ---------------------------------------->|
+   |                                        user signs in             |
+   |<-- redirect to claude.ai/api/mcp/auth_callback?code=… -----------|
+   |-- exchange code for access token -------------------------------->|
+   |<-- JWT (sub, iss, aud=client_id) ---------------------------------|
+   |                               |                                  |
+   |-- POST /mcp, Bearer <JWT> --->|                                  |
+   |                               |-- fetch JWKS (cached) ---------->|
+   |                               |   verify signature + issuer      |
+   |                               |   sub -> data/users/<hash>/      |
+   |<-- tool result ---------------|                                  |
+```
 
-`src/transport.ts`
+Notes:
 
-This is the boundary between the outside world and the MCP server.
+- `/register` is a small proxy, not real Dynamic Client Registration. It hands every caller the same pre-registered WorkOS client and only allows Claude's redirect URI. When `DCR_CLIENT_ID` is unset, the protected-resource metadata points Claude straight at AuthKit, which has its own registration endpoint.
+- WorkOS sets `aud` to the client ID, not the resource URL. Leave `OAUTH_AUDIENCE` unset or every token fails verification.
+- instant-db never stores Claude's access token; it verifies it on every request. The authorization-server metadata only advertises the `authorization_code` grant, so whether Claude can refresh without a new sign-in is unverified.
 
-In local mode it:
-- starts `StdioServerTransport`
+### 2. Dashboard (session cookie)
 
-In hosted mode it:
-- serves `POST /mcp`
-- answers `HEAD /mcp` with `MCP-Protocol-Version`
-- serves `/health`
-- serves `/.well-known/oauth-protected-resource`
-- returns `401` with a `WWW-Authenticate` challenge when auth is required and missing/invalid
+The web app at the server root. The server does the OAuth code exchange itself, then switches to its own cookie.
 
-### 3) Auth layer
+```text
+ Browser                     instant-db (Fly)                  WorkOS / AuthKit
+   |-- GET /auth/login ----------->|                                  |
+   |<-- 302 to authorize, state + PKCE cookie                         |
+   |-- sign in ------------------------------------------------------>|
+   |<-- 302 /auth/callback?code=… ------------------------------------|
+   |-- GET /auth/callback -------->|                                  |
+   |                               |-- code + client secret --------->|
+   |                               |<-- id_token (sub, email) --------|
+   |<-- 302 /dashboard, Set-Cookie: mcp_session (signed, 7 days)      |
+   |-- GET /api/me, /api/status, /api/databases (cookie) -->|         |
+```
 
-`src/auth.ts`
+- The cookie is HMAC-signed with `SESSION_SECRET`. WorkOS isn't involved again until it expires. Rotating `SESSION_SECRET` signs everyone out.
+- The dashboard reads the same `data/users/<hash>/` directory the MCP tools write to, which is how it shows a user's databases and whether Claude has connected.
 
-Only used for hosted HTTP mode.
+### 3. Personal access token (headless agents)
 
-Responsible for:
-- extracting bearer tokens from the `Authorization` header
-- verifying JWTs against WorkOS/AuthKit JWKS
-- reading the token subject (`sub`)
-- mapping that subject to a stable hashed storage key
+For agents that can't do a browser login (OpenClaw, Muse). WorkOS isn't involved.
 
-That lets the hosted deployment isolate each user's data without changing the tool layer.
+```text
+ Agent                       instant-db (Fly)
+   |-- POST /mcp, Bearer mcpdb_pat_… -->|
+   |                                    |  sha256(token) -> _accounts.sqlite
+   |                                    |  -> sub (if not revoked or expired)
+   |                                    |  sub -> data/users/<hash>/
+   |<-- tool result --------------------|
+```
 
-### 4) MCP server assembly
+- Tokens are minted with `scripts/pat.ts` (CLI only for now). The plaintext is shown once; only the hash is stored.
+- A token has the same access as its owner's OAuth session. Calls count against the owner's usage.
 
-`src/server.ts`
+## Inside a `/mcp` request
 
-Responsible for:
-- constructing the `McpServer`
-- constructing the `DatabaseRegistry`
-- constructing the logger
-- registering all tool groups
+Whichever path produced the `sub`, the rest is the same:
 
-This is the shared middle layer used by both local and hosted mode.
+1. `transport.ts` maps `sub` to `data/users/<hash>/`.
+2. `server.ts` builds an MCP server, a `DatabaseRegistry` and a `Logger` for that directory only.
+3. The usage hook (`usage.ts`) is attached to the logger.
+4. Each tool call goes through `logger.wrap()`: quota check, then the tool, then a usage record. With `USAGE_ENFORCE=false` (the default), an over-limit call is logged as `quota_would_reject` and still runs.
+5. Tool handlers read and write SQLite files only inside that directory.
 
-### 5) Tool handlers
+A server instance never holds more than one user's directory, so one user can't reach another's data through the tool layer.
 
-`src/tools/database.ts`
-`src/tools/schema.ts`
-`src/tools/records.ts`
-`src/tools/query.ts`
-`src/tools/mutation.ts`
+Local stdio mode skips steps 1 and 3: no `sub`, no metering, and the data directory is `DATA_DIR` itself.
 
-Responsible for implementing the actual MCP API that the client sees.
+## What's stored where
 
-Examples:
-- `list_databases`
-- `create_database`
-- `create_table`
-- `insert_record`
-- `query_records`
-- `execute_query`
-- `execute_mutation`
+| Place | Contents |
+|---|---|
+| WorkOS | User accounts, credentials, login sessions |
+| Fly secrets | Settings listed below |
+| `/data/users/<hash>/` | One user's databases (`*.sqlite`), their `_metadata.sqlite`, a last-seen marker |
+| `/data/_accounts.sqlite` | `accounts` (plan), `usage_daily` (tool calls per day), `personal_access_tokens` (hashes) |
+| `/data/logs/mcp.log` | JSONL log of tool calls |
+| Claude | Its own OAuth tokens for the connector |
 
-These handlers do not need to care whether requests arrived over stdio or HTTP.
+Nothing on the volume is backed up yet. See `SPECS/external-launch-readiness.md`, stage 2.
 
-### 6) Storage layer
+## Settings
 
-`src/db/registry.ts`
-`src/db/sqlite.ts`
+Hosted mode (`MCP_TRANSPORT=http`, `AUTH_REQUIRED=true`) needs all of these, and `src/config.ts` refuses to start without them:
 
-Responsible for:
-- keeping the metadata registry in `_metadata.sqlite`
-- opening and managing the user/database-specific SQLite files
-- creating one SQLite file per logical database
+| Setting | Used by |
+|---|---|
+| `PUBLIC_BASE_URL` | Discovery documents, redirect URIs, the URL users give Claude |
+| `OAUTH_ISSUER` | Verifying every JWT: the WorkOS domain that signs them |
+| `OAUTH_AUTH_ENDPOINT` | Dashboard sign-in redirect; advertised to Claude |
+| `OAUTH_TOKEN_ENDPOINT` | Dashboard code exchange; advertised to Claude |
+| `DCR_CLIENT_ID`, `DCR_CLIENT_SECRET` | Dashboard code exchange and the `/register` proxy |
+| `SESSION_SECRET` | Signing dashboard cookies (not a WorkOS value) |
 
-Local mode uses:
-- `data/`
-
-Hosted mode uses:
-- `data/users/<hashed-subject>/`
-
-That means the hosted deployment gets app-layer multi-tenancy while preserving the same underlying database model.
-
-## Request flow examples
-
-### Local request flow
-
-1. Claude Desktop launches the MCP process over stdio
-2. The app builds the MCP server and registers tools
-3. Claude calls a tool like `create_database`
-4. The tool uses `DatabaseRegistry`
-5. SQLite files are written under `data/`
-
-### Hosted request flow
-
-1. Remote client calls `https://.../mcp`
-2. HTTP transport checks whether auth is required
-3. Auth layer verifies the bearer token
-4. The token subject is mapped to `data/users/<hash>/`
-5. The MCP server is created with that scoped data directory
-6. Tool handlers run exactly as they do locally
-7. SQLite files are written only inside that user's directory
-
-## Why this design works
-
-### Shared core logic
-
-The same:
-- tool handlers
-- registry logic
-- SQLite adapter
-- data model
-
-work in both local and hosted mode.
-
-That keeps behavior consistent and lowers the chance that local and remote deployments drift apart.
-
-### Backward compatibility
-
-`MCP_TRANSPORT=stdio` remains the default path, so existing local users do not have to change anything.
-
-### Incremental hosting path
-
-The hosted MVP can be layered on top of the local server by adding:
-- HTTP transport
-- OAuth metadata + bearer auth
-- per-user storage scoping
-- Fly deployment
-
-without rewriting the actual tool logic.
-
-## Current status
-
-As of the current MVP work:
-- local stdio mode is implemented
-- hosted streamable HTTP mode is implemented
-- protected-resource metadata is implemented
-- bearer-token verification hooks are implemented
-- per-user storage scoping is implemented
-- Fly deployment is live
-- final WorkOS/AuthKit end-to-end auth wiring is the remaining hosted-MVP step
+Where each value comes from: `docs/fly-deployment.md`, "Required secrets".
 
 ## Files to read next
 
-- `README.md` — project overview
-- `docs/fly-deployment.md` — hosted deployment notes
-- `docs/decisions/0001-remote-mcp-oauth-provider.md` — why WorkOS/AuthKit is the MVP choice
-- `SPECS/remote-hosted-service.md` — broader hosted-service plan
+- `docs/fly-deployment.md`: deploying and the required secrets
+- `docs/decisions/0001-remote-mcp-oauth-provider.md`: why WorkOS/AuthKit
+- `SPECS/remote-hosted-service.md`: the hosted-service plan
+- `SPECS/usage-metering-billing.md`: metering and billing
+- `SPECS/external-launch-readiness.md`: what's left before external users
