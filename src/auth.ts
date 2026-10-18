@@ -35,7 +35,7 @@ export function extractBearerToken(authorizationHeader: string | undefined): str
     throw new UnauthorizedError("Invalid authorization header");
   }
 
-  return match[1].trim();
+  return match[1]!.trim();
 }
 
 export class JwtAccessTokenVerifier {

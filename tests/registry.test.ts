@@ -181,8 +181,8 @@ describe("DatabaseRegistry", () => {
       registry.updateFieldMetadata("mydb", "meals", "cal", "Cal", "v2");
       const fields = registry.getFieldsMetadata("mydb");
       expect(fields).toHaveLength(1);
-      expect(fields[0].display_name).toBe("Cal");
-      expect(fields[0].description).toBe("v2");
+      expect(fields[0]!.display_name).toBe("Cal");
+      expect(fields[0]!.description).toBe("v2");
     });
 
     it("updateFieldMetadata allows partial updates", async () => {
@@ -190,8 +190,8 @@ describe("DatabaseRegistry", () => {
       await registry.create("mydb");
       registry.updateFieldMetadata("mydb", "meals", "cal", "Calories");
       const fields = registry.getFieldsMetadata("mydb");
-      expect(fields[0].display_name).toBe("Calories");
-      expect(fields[0].description).toBeNull();
+      expect(fields[0]!.display_name).toBe("Calories");
+      expect(fields[0]!.description).toBeNull();
     });
 
     it("updateFieldMetadata throws for unknown database", () => {
@@ -228,8 +228,8 @@ describe("DatabaseRegistry", () => {
       const r2 = new DatabaseRegistry(TEST_DIR);
       const fields = r2.getFieldsMetadata("mydb");
       expect(fields).toHaveLength(1);
-      expect(fields[0].display_name).toBe("Calories");
-      expect(fields[0].description).toBe("Integer kcal");
+      expect(fields[0]!.display_name).toBe("Calories");
+      expect(fields[0]!.description).toBe("Integer kcal");
     });
   });
 

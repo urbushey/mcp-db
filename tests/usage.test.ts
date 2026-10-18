@@ -140,7 +140,7 @@ describe("Logger.wrap metering", () => {
     const logger = new Logger({ LOG_LEVEL: "off", LOG_PATH: join(root, "mcp.log") }, hook);
 
     let executed = false;
-    const result = (await logger.wrap("query_records", {}, async () => {
+    const result = (await logger.wrap<unknown>("query_records", {}, async () => {
       executed = true;
       return "ran";
     })) as { isError?: boolean; content: Array<{ text: string }> };

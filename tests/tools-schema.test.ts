@@ -228,8 +228,8 @@ describe("schema tools", () => {
 
       const fields = registry.getFieldsMetadata("mydb");
       expect(fields).toHaveLength(1);
-      expect(fields[0].display_name).toBe("Calories");
-      expect(fields[0].description).toBe("kcal");
+      expect(fields[0]!.display_name).toBe("Calories");
+      expect(fields[0]!.description).toBe("kcal");
     });
   });
 });
