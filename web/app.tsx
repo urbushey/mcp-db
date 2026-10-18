@@ -1,5 +1,5 @@
 import { createRoot } from "react-dom/client";
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 
 // ---- Types ----
 
@@ -221,91 +221,288 @@ function useConnectionStatus(pollMs = 3000) {
   return { status, justConnected };
 }
 
-// ---- Landing Page ----
+// ---- Landing Page (single-page scroller — copy source: SPECS/homepage-copy.md) ----
+
+const GITHUB_URL = "https://github.com/urbushey/mcp-db";
+
+function BigTitle({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return (
+    <h2 className={`text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight leading-[0.95] ${className}`}>
+      {children}
+    </h2>
+  );
+}
+
+function CtaButton({ href, children, inverted = false }: { href: string; children: ReactNode; inverted?: boolean }) {
+  return (
+    <a
+      href={href}
+      className={`inline-block px-8 py-4 rounded-full font-bold text-base transition-colors ${
+        inverted
+          ? "bg-zinc-950 text-white hover:bg-zinc-800"
+          : "bg-white text-zinc-950 hover:bg-emerald-300"
+      }`}
+    >
+      {children}
+    </a>
+  );
+}
+
+const TRACK_EXAMPLES = [
+  ["🧗", "climbing sends by grade and gym"],
+  ["🍞", "sourdough feeds and rise times"],
+  ["🏋️", "every set, rep, and PR"],
+  ["📚", "books started vs. actually finished"],
+  ["🍅", "which tomato varieties survived July"],
+  ["🏠", "homelab uptime incidents"],
+  ["💸", "the kid's allowance ledger"],
+  ["🍷", "wines you liked before you forgot them"],
+  ["⛽", "fuel economy per fill-up"],
+] as const;
+
+const FAQ = [
+  {
+    q: "Is my data locked in?",
+    a: "It's a SQLite file. The most portable database format in existence. Cloud data export lands before we charge anyone a dollar — that's a hard rule in our billing spec, which is public, in the repo.",
+  },
+  {
+    q: "What if you shut down?",
+    a: "You self-host the same MIT-licensed server the cloud runs, and your data is standard SQLite. Worst case, you lose convenience, not data.",
+  },
+  {
+    q: "Why not just use Notion / a spreadsheet?",
+    a: "Because you won't open it. The point is telling Claude mid-conversation and moving on with your life.",
+  },
+  {
+    q: "Who can see my data?",
+    a: "Cloud data lives in per-user isolated storage, over TLS, behind OAuth. It's a beta run by one person — read the code and threat-model accordingly. Paranoid? Self-host. We'll help.",
+  },
+  {
+    q: "What's an MCP server?",
+    a: "The plug-in standard for Claude (and other AI clients). instant-db speaks it over stdio locally or HTTP remotely.",
+  },
+] as const;
 
 function Landing() {
   const error = new URLSearchParams(window.location.search).get("error");
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white flex flex-col">
-      {/* Header */}
-      <header className="border-b border-white/10 px-6 py-4 flex items-center justify-between">
-        <span className="font-semibold text-lg tracking-tight">instant-db</span>
-        <a href="/dashboard" className="text-sm text-zinc-400 hover:text-white transition-colors">
-          Sign in →
-        </a>
+    <div className="min-h-screen bg-zinc-950 text-white">
+      {/* Sticky nav */}
+      <header className="sticky top-0 z-50 bg-zinc-950/90 backdrop-blur border-b border-white/10 px-6 py-4 flex items-center justify-between">
+        <span className="font-black text-lg tracking-tight">instant-db</span>
+        <nav className="flex items-center gap-5 text-sm">
+          <a href="#self-host" className="text-zinc-400 hover:text-white transition-colors hidden sm:block">
+            Self-host
+          </a>
+          <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-white transition-colors">
+            GitHub
+          </a>
+          <a href="/dashboard" className="text-white font-semibold hover:text-emerald-300 transition-colors">
+            Sign in →
+          </a>
+        </nav>
       </header>
 
-      {/* Main */}
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-16 max-w-xl mx-auto w-full">
-        {error && (
-          <div className="w-full mb-6 px-4 py-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
-            Authentication error: {error.replace(/_/g, " ")}
-          </div>
-        )}
+      {error && (
+        <div className="max-w-3xl mx-auto mt-6 px-4 py-3 mx-6 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
+          Authentication error: {error.replace(/_/g, " ")}
+        </div>
+      )}
 
-        <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold mb-3 leading-tight">Give Claude a memory</h1>
-          <p className="text-zinc-400 text-lg">
-            Track meals, workouts, expenses — anything — just by talking to Claude. Your data
-            persists across every chat and every device. No SQL, no spreadsheets, no setup.
+      {/* Screen 1 — Problem */}
+      <section className="min-h-[92vh] flex flex-col items-center justify-center text-center px-6 py-20">
+        <h1 className="text-5xl sm:text-7xl lg:text-8xl font-black tracking-tight leading-[0.95] max-w-4xl">
+          CLAUDE FORGETS EVERYTHING.
+        </h1>
+        <p className="mt-8 text-lg sm:text-xl text-zinc-400 max-w-xl leading-relaxed">
+          Every chat starts from zero. Your workout log. Your reading list. The name of your
+          sourdough starter. Gone.
+        </p>
+        <p className="mt-6 text-xl sm:text-2xl font-bold max-w-xl">
+          instant-db is a real database for Claude.
+          <br />
+          Talk to it once. It remembers forever.
+        </p>
+        <div className="mt-10 flex flex-col sm:flex-row items-center gap-4">
+          <CtaButton href="/auth/login">Give Claude a memory →</CtaButton>
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-8 py-4 rounded-full font-bold text-base border border-white/20 hover:border-white/60 transition-colors"
+          >
+            Read the source
+          </a>
+        </div>
+        <p className="mt-6 text-xs text-zinc-600 tracking-wide">
+          Free while in beta · MIT-licensed · it's just SQLite
+        </p>
+      </section>
+
+      {/* Screen 2 — Transcript */}
+      <section className="px-6 py-24 border-t border-white/10">
+        <div className="max-w-2xl mx-auto">
+          <p className="text-sm font-black tracking-widest text-emerald-400 uppercase mb-10">
+            This is the whole product.
+          </p>
+          <div className="space-y-4 font-mono text-sm sm:text-base">
+            <div className="bg-zinc-900 border border-white/10 rounded-2xl rounded-bl-sm px-5 py-4">
+              <p className="text-zinc-500 text-xs mb-1">you</p>
+              <p>track my climbing sends — grade, gym, flash or not</p>
+            </div>
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl rounded-br-sm px-5 py-4 ml-6 sm:ml-12">
+              <p className="text-emerald-400/60 text-xs mb-1">claude</p>
+              <p>
+                <span className="inline-block bg-zinc-950 border border-white/10 rounded px-2 py-0.5 text-xs text-emerald-300 mr-2">
+                  create_database("climbing") ✓
+                </span>
+                I'll log grade, gym, attempts, and date.
+              </p>
+            </div>
+            <div className="bg-zinc-900 border border-white/10 rounded-2xl rounded-bl-sm px-5 py-4">
+              <p className="text-zinc-500 text-xs mb-1">you · three weeks later · from your phone, in line for coffee</p>
+              <p>what's my hardest send this month?</p>
+            </div>
+            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl rounded-br-sm px-5 py-4 ml-6 sm:ml-12">
+              <p className="text-emerald-400/60 text-xs mb-1">claude</p>
+              <p>V6 at Movement, flashed on the 14th. You're two grades up from May.</p>
+            </div>
+          </div>
+          <p className="mt-10 text-zinc-400 text-lg">
+            No schema. No SQL. No app to check. You talk, Claude does the typing.
           </p>
         </div>
+      </section>
 
-        <a
-          href="/auth/login"
-          className="mb-4 px-8 py-3 bg-white text-zinc-950 rounded-full font-semibold text-sm hover:bg-zinc-200 transition-colors"
-        >
-          Get started — it's free
-        </a>
-        <p className="text-zinc-600 text-xs mb-12">
-          Two minutes from here to your first database. We'll walk you through it.
-        </p>
+      {/* Screen 3 — Trust (inverted) */}
+      <section className="bg-white text-zinc-950 px-6 py-32">
+        <div className="max-w-3xl mx-auto">
+          <BigTitle>IT'S JUST SQLITE.</BigTitle>
+          <p className="mt-8 text-lg sm:text-xl leading-relaxed text-zinc-700 max-w-2xl">
+            No vector store. No embeddings pipeline. No "memory layer" that half-remembers your
+            grocery list as a vibe.
+          </p>
+          <p className="mt-6 text-lg sm:text-xl leading-relaxed text-zinc-700 max-w-2xl">
+            Rows. Columns. A <code className="bg-zinc-100 border border-zinc-300 rounded px-1.5 py-0.5 text-base">.sqlite</code> file
+            with your name on it. Open it in anything. Take it anywhere. It'll outlive us — SQLite
+            files from 2004 still open fine, and that's the format your data lives in.
+          </p>
+        </div>
+      </section>
 
-        {/* How it works */}
-        <div className="w-full mb-10">
-          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-widest mb-5">
-            How it works
-          </h2>
-          <ol className="space-y-4">
-            {[
-              { n: 1, title: "Create your free account", detail: "One click — sign in with the button above." },
-              { n: 2, title: "Add instant-db to Claude", detail: "Paste one URL into Claude's settings. We show you exactly where, for every device." },
-              { n: 3, title: "Just talk", detail: '"Track my workouts." Claude builds the database and remembers everything, forever.' },
-            ].map((step) => (
-              <li key={step.n} className="flex gap-4 items-start">
-                <span className="flex-shrink-0 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-sm font-semibold">
-                  {step.n}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm">{step.title}</p>
-                  <p className="text-zinc-500 text-xs mt-0.5">{step.detail}</p>
-                </div>
+      {/* Screen 4 — Self-host */}
+      <section id="self-host" className="px-6 py-32 border-t border-white/10">
+        <div className="max-w-3xl mx-auto">
+          <BigTitle>
+            SELF-HOST IT. <span className="text-emerald-400">SERIOUSLY.</span>
+          </BigTitle>
+          <p className="mt-8 text-lg text-zinc-400 leading-relaxed max-w-2xl">
+            This is not a trick. The server is MIT-licensed and runs on your laptop in about two
+            minutes. If you live in Claude Code or Claude Desktop, you may never need us:
+          </p>
+          <div className="mt-8 bg-zinc-900 border border-white/10 rounded-xl p-5 font-mono text-sm text-zinc-300 overflow-x-auto">
+            <p><span className="text-zinc-600">$</span> git clone {GITHUB_URL}</p>
+            <p><span className="text-zinc-600">$</span> cd mcp-db && bun install</p>
+            <p><span className="text-zinc-600">$</span> claude mcp add instant-db -- bun run src/index.ts</p>
+          </div>
+          <p className="mt-8 text-lg text-zinc-400 leading-relaxed max-w-2xl">
+            That's the entire install. Your data never leaves your machine. We put this on the
+            homepage because you'd have found it anyway.
+          </p>
+        </div>
+      </section>
+
+      {/* Screen 5 — Conversion */}
+      <section className="px-6 py-32 border-t border-white/10 bg-zinc-900/40">
+        <div className="max-w-3xl mx-auto">
+          <BigTitle>
+            SO WHY PAY?
+            <br />
+            ONE WORD: <span className="text-emerald-400">YOUR PHONE.</span>
+          </BigTitle>
+          <div className="mt-8 space-y-6 text-lg text-zinc-400 leading-relaxed max-w-2xl">
+            <p>
+              A local MCP server is a process on your laptop. Claude on your phone — and claude.ai
+              in any browser — can only talk to <span className="text-white font-semibold">remote</span> MCP
+              servers, and remote servers need real OAuth.
+            </p>
+            <p>
+              That's the part that's genuinely annoying to build: a public HTTPS endpoint, an OAuth
+              flow Claude's mobile apps accept, per-user isolation, and a machine that's awake when
+              you think of something at 11pm.
+            </p>
+            <p className="text-white font-semibold">
+              instant-db Cloud is that, done. Paste one URL into Claude's settings. Sign in once.
+              Same databases on your laptop, your phone, and claude.ai.
+            </p>
+            <p>
+              The founder self-hosted for months. The day remote auth worked from his phone is the
+              day he'd have started paying. That's the product.
+            </p>
+          </div>
+          <div className="mt-10">
+            <CtaButton href="/auth/login">Get your URL →</CtaButton>
+          </div>
+          <p className="mt-6 text-xs text-zinc-600 max-w-2xl">
+            Free while in beta. ~$10/mo when billing ships. Self-hosting stays free forever — that's
+            a license, not a promo.
+          </p>
+        </div>
+      </section>
+
+      {/* Screen 6 — Specificity grid */}
+      <section className="px-6 py-32 border-t border-white/10">
+        <div className="max-w-3xl mx-auto">
+          <p className="text-sm font-black tracking-widest text-emerald-400 uppercase mb-10">
+            A database for everything you'd never build a database for.
+          </p>
+          <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {TRACK_EXAMPLES.map(([emoji, label]) => (
+              <li key={label} className="bg-zinc-900 border border-white/10 rounded-xl px-4 py-4 text-sm text-zinc-300 flex items-start gap-3">
+                <span className="text-lg leading-none">{emoji}</span>
+                <span>{label}</span>
               </li>
             ))}
-          </ol>
+          </ul>
+          <p className="mt-8 text-lg text-zinc-400">If you can say it, Claude can track it.</p>
         </div>
+      </section>
 
-        {/* Works everywhere */}
-        <div className="w-full bg-zinc-900 border border-white/10 rounded-xl p-5 text-center">
-          <p className="text-sm text-zinc-400">
-            Works with <span className="text-zinc-200">claude.ai</span>,{" "}
-            <span className="text-zinc-200">Claude on iPhone &amp; Android</span>,{" "}
-            <span className="text-zinc-200">Claude Desktop</span>, and{" "}
-            <span className="text-zinc-200">Claude Code</span>.
+      {/* Screen 7 — FAQ */}
+      <section className="px-6 py-32 border-t border-white/10">
+        <div className="max-w-3xl mx-auto">
+          <p className="text-sm font-black tracking-widest text-emerald-400 uppercase mb-10">
+            Questions a reasonable person would ask.
           </p>
+          <dl className="space-y-10">
+            {FAQ.map(({ q, a }) => (
+              <div key={q}>
+                <dt className="text-xl font-bold mb-2">{q}</dt>
+                <dd className="text-zinc-400 leading-relaxed">{a}</dd>
+              </div>
+            ))}
+          </dl>
         </div>
-      </main>
+      </section>
 
-      <footer className="border-t border-white/10 px-6 py-4 text-center text-zinc-600 text-xs">
-        <a
-          href="https://github.com/urbushey/mcp-db"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-zinc-400 transition-colors"
-        >
-          GitHub
-        </a>
+      {/* Footer CTA */}
+      <footer className="px-6 py-32 border-t border-white/10 text-center">
+        <BigTitle className="max-w-3xl mx-auto">GIVE CLAUDE A MEMORY.</BigTitle>
+        <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+          <CtaButton href="/auth/login">Get started free →</CtaButton>
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-8 py-4 rounded-full font-bold text-base border border-white/20 hover:border-white/60 transition-colors"
+          >
+            GitHub
+          </a>
+        </div>
+        <p className="mt-16 text-xs text-zinc-600">
+          instant-db · built on Bun + SQLite · MIT · made by a person, not a platform
+        </p>
       </footer>
     </div>
   );
