@@ -15,6 +15,11 @@ describe("loadConfig", () => {
     "OAUTH_AUDIENCE",
     "OAUTH_JWKS_URL",
     "PUBLIC_BASE_URL",
+    "OAUTH_AUTH_ENDPOINT",
+    "OAUTH_TOKEN_ENDPOINT",
+    "DCR_CLIENT_ID",
+    "DCR_CLIENT_SECRET",
+    "SESSION_SECRET",
   ];
 
   afterEach(() => {
@@ -61,6 +66,11 @@ describe("loadConfig", () => {
     process.env["OAUTH_AUDIENCE"] = "https://mcp.example.com";
     process.env["OAUTH_JWKS_URL"] = "https://auth.example.com/jwks";
     process.env["PUBLIC_BASE_URL"] = "https://mcp.example.com";
+    process.env["OAUTH_AUTH_ENDPOINT"] = "https://auth.example.com/oauth2/authorize";
+    process.env["OAUTH_TOKEN_ENDPOINT"] = "https://auth.example.com/oauth2/token";
+    process.env["DCR_CLIENT_ID"] = "client_test";
+    process.env["DCR_CLIENT_SECRET"] = "secret_test";
+    process.env["SESSION_SECRET"] = "session_test";
 
     const { loadConfig } = await import("../src/config.ts");
     const config = loadConfig();
@@ -86,4 +96,43 @@ describe("loadConfig", () => {
     expect(config.AUTH_REQUIRED).toBe(false);
   });
 
+});
+
+describe("parseConfig", () => {
+  const hosted = {
+    MCP_TRANSPORT: "http",
+    AUTH_REQUIRED: "true",
+    OAUTH_ISSUER: "https://auth.example.com",
+    PUBLIC_BASE_URL: "https://mcp.example.com",
+    OAUTH_AUTH_ENDPOINT: "https://auth.example.com/oauth2/authorize",
+    OAUTH_TOKEN_ENDPOINT: "https://auth.example.com/oauth2/token",
+    DCR_CLIENT_ID: "client_test",
+    DCR_CLIENT_SECRET: "secret_test",
+    SESSION_SECRET: "session_test",
+  };
+
+  it("accepts a fully configured hosted server", async () => {
+    const { parseConfig } = await import("../src/config.ts");
+    expect(parseConfig(hosted).errors).toBeUndefined();
+  });
+
+  it("rejects a hosted server missing the sign-in settings, naming each one", async () => {
+    const { parseConfig } = await import("../src/config.ts");
+    const { errors } = parseConfig({
+      MCP_TRANSPORT: "http",
+      AUTH_REQUIRED: "true",
+      OAUTH_ISSUER: "https://auth.example.com",
+      PUBLIC_BASE_URL: "https://mcp.example.com",
+    });
+    const joined = (errors ?? []).join("\n");
+    for (const key of ["OAUTH_AUTH_ENDPOINT", "OAUTH_TOKEN_ENDPOINT", "DCR_CLIENT_ID", "DCR_CLIENT_SECRET", "SESSION_SECRET"]) {
+      expect(joined).toContain(key);
+    }
+  });
+
+  it("does not require sign-in settings for local stdio or unauthenticated HTTP", async () => {
+    const { parseConfig } = await import("../src/config.ts");
+    expect(parseConfig({}).errors).toBeUndefined();
+    expect(parseConfig({ MCP_TRANSPORT: "http", AUTH_REQUIRED: "false" }).errors).toBeUndefined();
+  });
 });

@@ -45,23 +45,43 @@ const ConfigSchema = z.object({
     });
   }
 
-  if (config.MCP_TRANSPORT === "http" && config.AUTH_REQUIRED && !config.PUBLIC_BASE_URL) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["PUBLIC_BASE_URL"],
-      message: "PUBLIC_BASE_URL is required for authenticated HTTP transport",
-    });
+  if (config.MCP_TRANSPORT === "http" && config.AUTH_REQUIRED) {
+    // Without these the server starts but dashboard sign-in and /register
+    // return 503. Fail at startup so a half-configured deploy never goes live.
+    for (const key of [
+      "PUBLIC_BASE_URL",
+      "OAUTH_AUTH_ENDPOINT",
+      "OAUTH_TOKEN_ENDPOINT",
+      "DCR_CLIENT_ID",
+      "DCR_CLIENT_SECRET",
+      "SESSION_SECRET",
+    ] as const) {
+      if (!config[key]) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: [key],
+          message: `${key} is required for authenticated HTTP transport`,
+        });
+      }
+    }
   }
 });
 
 export type Config = z.infer<typeof ConfigSchema>;
 
-export function loadConfig(): Config {
-  const result = ConfigSchema.safeParse(process.env);
+export function parseConfig(env: Record<string, string | undefined>): { config?: Config; errors?: string[] } {
+  const result = ConfigSchema.safeParse(env);
   if (!result.success) {
-    const errors = result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("\n");
-    console.error(`Configuration error:\n${errors}`);
+    return { errors: result.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`) };
+  }
+  return { config: result.data };
+}
+
+export function loadConfig(): Config {
+  const { config, errors } = parseConfig(process.env);
+  if (!config) {
+    console.error(`Configuration error:\n${errors!.join("\n")}`);
     process.exit(1);
   }
-  return result.data;
+  return config;
 }

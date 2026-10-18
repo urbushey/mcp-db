@@ -369,7 +369,12 @@ function Dashboard() {
           window.location.href = "/auth/login";
           return;
         }
-        if (!meRes.ok) throw new Error("Failed to load user");
+        if (!meRes.ok) {
+          // Show the server's reason (e.g. "Session not configured") so a
+          // misconfigured deploy is obvious instead of a generic failure.
+          const body = (await meRes.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(`Couldn't load your account: ${body?.error ?? `HTTP ${meRes.status}`}`);
+        }
         const me = (await meRes.json()) as User;
         setUser(me);
       } catch (err) {
