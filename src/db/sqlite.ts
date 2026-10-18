@@ -1,4 +1,4 @@
-import { Database } from "bun:sqlite";
+import { Database, type SQLQueryBindings } from "bun:sqlite";
 import type { IDbAdapter, TableSchema, QueryFilter, QueryOptions } from "./adapter.ts";
 
 function sqliteType(type: string): string {
@@ -72,7 +72,7 @@ export class SqliteAdapter implements IDbAdapter {
     const cols = keys.map((k) => `"${k}"`).join(", ");
     const result = this.db
       .query(`INSERT INTO "${table}" (${cols}) VALUES (${placeholders})`)
-      .run(...Object.values(record));
+      .run(...(Object.values(record) as SQLQueryBindings[]));
     return { id: Number(result.lastInsertRowid) };
   }
 
@@ -105,7 +105,7 @@ export class SqliteAdapter implements IDbAdapter {
     if (keys.length === 0) throw new Error("No fields to update");
 
     const sets = keys.map((k) => `"${k}" = ?`).join(", ");
-    const values = Object.values(record);
+    const values = Object.values(record) as SQLQueryBindings[];
     this.db.query(`UPDATE "${table}" SET ${sets} WHERE id = ?`).run(...values, id);
   }
 

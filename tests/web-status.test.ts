@@ -73,6 +73,7 @@ function makeConfig(baseDir: string, issuer: string): Config {
     MCP_HTTP_PORT: 0,
     MCP_HTTP_PATH: "/mcp",
     AUTH_REQUIRED: true,
+    USAGE_ENFORCE: false,
     OAUTH_ISSUER: issuer,
     OAUTH_AUDIENCE: "https://mcp.example.test",
     OAUTH_JWKS_URL: `${issuer}/.well-known/jwks.json`,

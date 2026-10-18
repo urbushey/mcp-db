@@ -260,8 +260,8 @@ describe("database tools", () => {
 
       const fields = registry.getFieldsMetadata("mydb");
       expect(fields).toHaveLength(1);
-      expect(fields[0].display_name).toBe("Meal");
-      expect(fields[0].description).toBe("One of: breakfast, lunch, dinner, snack");
+      expect(fields[0]!.display_name).toBe("Meal");
+      expect(fields[0]!.description).toBe("One of: breakfast, lunch, dinner, snack");
     });
 
     it("works with only displayName", async () => {
@@ -275,8 +275,8 @@ describe("database tools", () => {
       });
 
       const fields = registry.getFieldsMetadata("mydb");
-      expect(fields[0].display_name).toBe("Calories");
-      expect(fields[0].description).toBeNull();
+      expect(fields[0]!.display_name).toBe("Calories");
+      expect(fields[0]!.description).toBeNull();
     });
 
     it("works with only description", async () => {
@@ -290,8 +290,8 @@ describe("database tools", () => {
       });
 
       const fields = registry.getFieldsMetadata("mydb");
-      expect(fields[0].display_name).toBeNull();
-      expect(fields[0].description).toBe("Integer kcal");
+      expect(fields[0]!.display_name).toBeNull();
+      expect(fields[0]!.description).toBe("Integer kcal");
     });
 
     it("returns error for unknown database", async () => {

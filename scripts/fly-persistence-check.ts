@@ -1,7 +1,7 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
-const baseUrl = process.argv[2];
+const baseUrl = process.argv[2] ?? "";
 const dbName = process.argv[3] ?? `smoke_${Date.now()}`;
 if (!baseUrl) {
   console.error("Usage: bun run scripts/fly-persistence-check.ts <mcp-url> [db-name]");
