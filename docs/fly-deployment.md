@@ -4,7 +4,7 @@ This repo now has streamable HTTP transport, protected-resource metadata, and be
 
 - Current entrypoint: `src/index.ts`
 - HTTP transport path: `/mcp`
-- Auth config: `AUTH_REQUIRED`, `OAUTH_ISSUER`, `OAUTH_AUDIENCE`, `PUBLIC_BASE_URL`
+- Auth config: see [Required secrets](#required-secrets). The server refuses to start if any are missing.
 - Deployment/verification ticket: **#12**
 
 ## What is already prepared
@@ -44,7 +44,7 @@ Why:
 2. Create the app
 3. Create the volume
 4. Copy `fly.toml.example` to `fly.toml` and set the real app name
-5. Set real auth env/secrets (`PUBLIC_BASE_URL`, `AUTH_REQUIRED`, `OAUTH_ISSUER`, `OAUTH_AUDIENCE`, and optionally `OAUTH_JWKS_URL`)
+5. Set every secret in [Required secrets](#required-secrets)
 6. Deploy
 
 Example commands:
@@ -109,3 +109,41 @@ That confirms the Fly volume path is actually working, not just in-memory execut
 ## Important caveat
 
 A green Fly deploy is still not the same thing as a working remote MCP server. Do not call the MVP done until the live app passes protocol smoke tests and a real remote client flow.
+
+## Required secrets
+
+With `MCP_TRANSPORT=http` and `AUTH_REQUIRED=true`, `loadConfig()` exits at startup unless all of these are set. Before that check existed, a deploy missing the last five served the landing page while `/auth/login`, `/api/me` and `/register` returned 503.
+
+| Setting | Value | Where it comes from |
+|---|---|---|
+| `AUTH_REQUIRED` | `true` | — |
+| `PUBLIC_BASE_URL` | `https://<your-domain>` | The URL users add to Claude. Changing it later breaks every existing connector. |
+| `OAUTH_ISSUER` | `https://<authkit-domain>` | WorkOS → Authentication → AuthKit → domain |
+| `OAUTH_AUTH_ENDPOINT` | `https://<authkit-domain>/oauth2/authorize` | `authorization_endpoint` in `https://<authkit-domain>/.well-known/oauth-authorization-server` |
+| `OAUTH_TOKEN_ENDPOINT` | `https://<authkit-domain>/oauth2/token` | `token_endpoint` in the same document |
+| `DCR_CLIENT_ID` | `client_01…` | WorkOS → Applications → your OAuth app. Not the environment client ID on the API Keys page. |
+| `DCR_CLIENT_SECRET` | | Same OAuth app. WorkOS shows it once when created. |
+| `SESSION_SECRET` | random | `openssl rand -base64 32`. Rotating it signs everyone out of the dashboard. |
+
+Optional: `OAUTH_JWKS_URL` (defaults to `<OAUTH_ISSUER>/.well-known/jwks.json`; AuthKit uses `/oauth2/jwks`), `OAUTH_AUDIENCE` (leave unset for WorkOS, which puts the client ID in `aud`), `USAGE_ENFORCE`.
+
+The OAuth app in WorkOS must allow both redirect URIs:
+
+- `https://<your-domain>/auth/callback` (dashboard sign-in)
+- `https://claude.ai/api/mcp/auth_callback` (Claude connector)
+
+Set them in one command so the app restarts once, and keep a copy of every value in a password manager:
+
+```bash
+fly secrets set -a <app-name> \
+  PUBLIC_BASE_URL=... OAUTH_ISSUER=... OAUTH_AUTH_ENDPOINT=... OAUTH_TOKEN_ENDPOINT=... \
+  DCR_CLIENT_ID=... DCR_CLIENT_SECRET=... SESSION_SECRET="$(openssl rand -base64 32)"
+```
+
+Check after deploying:
+
+```bash
+curl -si https://<your-domain>/auth/login | head -1          # 302 to WorkOS
+curl -si https://<your-domain>/api/me | head -1              # 401, not 503
+curl -si -X POST https://<your-domain>/register | head -1    # 201
+```
